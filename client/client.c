@@ -6,26 +6,36 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <netinet/in.h>
+#include <netdb.h>
 
+const int PORT_NUMBER = 500;
 const size_t BUF_SIZE = 100;
 
 void create_socket(int* socket_var) {
-	*socket_var = socket(AF_UNIX, SOCK_STREAM, 0);
+	*socket_var = socket(AF_INET, SOCK_STREAM, 0);
 	if(socket_var < 0) {
 		fprintf(stderr, "Error: couldn't create a socket\n");
 		exit(1);
 	}
 }
 
-void init_addr(struct sockaddr_un * addr, const char* path) {
-	bzero((char*) addr, sizeof(addr));
-	addr->sun_family = AF_UNIX;
-	strcpy(addr->sun_path, path);
+void init_host(struct hostent** server, char* host_name) {
+	*server = gethostbyname(host_name);
+	if(!(*server)) {
+		fprintf(stderr, "Error: couldn't locate a host with name %s", host_name);
+		exit(1);
+	}
 }
 
-void connect_to_server(int socket_var, struct sockaddr_un * server_addr) {
-	socklen_t len = strlen(server_addr->sun_path) + sizeof(server_addr->sun_family);
-	if(connect(socket_var, (struct sockaddr *) server_addr, len) < 0) {
+void init_addr(struct sockaddr_in* addr, struct hostent* server, int port_number) {
+	bzero((char*) addr, sizeof(addr));
+	addr->sin_family = AF_INET;
+	bcopy((char*)server->h_addr, (char*)&addr->sin_addr.s_addr, server->h_length);
+	addr->sin_port = htons(port_number);
+}
+
+void connect_to_server(int socket_var, struct sockaddr_in* server_addr) {
+	if(connect(socket_var, (struct sockaddr*) server_addr, sizeof(struct sockaddr)) < 0) {
 		fprintf(stderr, "Error: connection to server failed\n");
 		exit(1);
 	}
@@ -53,7 +63,8 @@ int main(int argc, char* argv[]) {
 	char buffer[BUF_SIZE];
 	char message[] = "Reply 'POTATO' (6 letters)";
 	socklen_t client_len;
-	struct sockaddr_un server_addr;
+	struct sockaddr_in server_addr;
+	struct hostent *server;
 	
 	if(argc < 2) {
 		fprintf(stderr, "Error: not enough arguments\n");
@@ -61,7 +72,8 @@ int main(int argc, char* argv[]) {
 	}
 	
 	create_socket(&socket_var);
-	init_addr(&server_addr, argv[1]);
+	init_host(&server, argv[1]);
+	init_addr(&server_addr, server, PORT_NUMBER);
 	connect_to_server(socket_var, &server_addr);
 	do_job(socket_var, message, buffer, BUF_SIZE);
 	close(socket_var);
