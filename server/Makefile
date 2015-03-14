@@ -1,8 +1,10 @@
-all: server
+SERVER_BIN=server
+COMMON_DIR=../common/
 
-server: server.c
-	gcc -Wall -Werror server.c -o server -l../common/
+all: $(SERVER_BIN)
+
+$(SERVER_BIN): server.c $(COMMON_DIR)/protocol.h
+	gcc -Wall -Werror -I$(COMMON_DIR) server.c -o $(SERVER_BIN)
 	
 clean:
-	rm -f *.o
-	rm -f *~
+	rm $(SERVER_BIN)

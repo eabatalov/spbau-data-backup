@@ -60,7 +60,6 @@ int main(int argc, char* argv[]) {
 	int socket_var;
 	char buffer[BUF_SIZE];
 	char message[] = "Reply 'POTATO' (6 letters)";
-	socklen_t client_len;
 	struct sockaddr_in server_addr;
 	struct hostent *server;
 	
