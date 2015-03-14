@@ -1,7 +1,7 @@
 all: client
 
 server: client.c
-	gcc client.c -o client
+	gcc -Wall -Werror client.c -o client -l../common/
 	
 clean:
 	rm -f *.o

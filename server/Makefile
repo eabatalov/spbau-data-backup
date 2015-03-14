@@ -1,7 +1,7 @@
 all: server
 
 server: server.c
-	gcc server.c -o server
+	gcc -Wall -Werror server.c -o server -l../common/
 	
 clean:
 	rm -f *.o
