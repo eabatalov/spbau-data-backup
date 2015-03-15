@@ -15,7 +15,7 @@ void open_dir(char* name, DIR** dest) {
 }
 
 void init_reg_file_inode(struct regular_file_inode *dest, struct dirent* source, struct inode* parent_dir) {
-	dest = (struct regular_file_inode*)malloc(sizeof(regular_file_inode));
+	dest = (struct regular_file_inode*)malloc(sizeof(struct regular_file_inode));
 	dest->inode.type = INODE_REG_FILE;
 	strcpy(dest->inode.name, source->d_name);
 	dest->inode.parent(parent_dir);
