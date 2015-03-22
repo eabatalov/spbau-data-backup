@@ -1,6 +1,7 @@
 BIN_DIR=bin/
 SRC_DIR=src/
 INCLUDE_DIR=include/
+CURRENT_DIR=./
 
 BIN_MAIN=$(BIN_DIR)/collect_file_tree
 
@@ -14,7 +15,7 @@ all: $(BIN_MAIN)
 $(BIN_MAIN): $(BIN_DIR)/collect_file_tree.o \
 	$(BIN_DIR)/file_tree.o \
 	$(INCLUDES) $(BIN_DIR)
-	$(CC) $(CFLAGS) $(word 1,2,$^) -o $@
+	$(CC) $(CFLAGS) $(wordlist 1,2,$^) -o $@
 
 $(BIN_DIR)/collect_file_tree.o: $(SRC_DIR)/collect_file_tree.c \
 	$(INCLUDES) $(BIN_DIR)
@@ -30,4 +31,7 @@ $(BIN_DIR):
 clean:
 	rm -rf $(BIN_DIR)
 
-.PHONY: clean
+mem_check:
+	valgrind --leak-check=yes $(BIN_MAIN) $(CURRENT_DIR)
+
+.PHONY: clean mem_check

@@ -20,7 +20,7 @@ enum inode_type {INODE_REG_FILE, INODE_DEV_FILE, INODE_DIR, INODE_LINK, INODE_MO
 
 struct inode {
 	enum inode_type type;
-	const char* name;
+	char* name;
 	struct inode* parent;
 	struct stat attrs;
 	void* user_data;
@@ -41,8 +41,8 @@ struct file_tree {
 };
 
 void open_dir(char* , DIR** );
-void init_reg_file_inode(struct regular_file_inode* , struct dirent* , struct inode* );
-void init_dir_inode(struct dir_inode* , const char* , struct inode* );
+struct regular_file_inode* init_reg_file_inode(struct dirent* , struct inode* );
+struct dir_inode* init_dir_inode(const char* , struct inode* );
 void walk_through_dir(DIR* , void (*f)(struct dirent*, void*), void* );
 void count(struct dirent* , void* );
 size_t count_dir_content(DIR* );
