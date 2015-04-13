@@ -37,19 +37,25 @@ struct dir_inode {
 };
 
 struct file_tree {
-	struct inode* head;
+	struct inode head;
 };
 
-void open_dir(char* , DIR** );
-struct regular_file_inode* init_reg_file_inode(struct dirent* , struct inode* );
-struct dir_inode* init_dir_inode(const char* , struct inode* );
-void walk_through_dir(DIR* , void (*f)(struct dirent*, void*), void* );
-void count(struct dirent* , void* );
-size_t count_dir_content(DIR* );
-void process_dir_child(struct dirent* , void* );
-void process_dir(DIR* , struct dir_inode* );
-void init_parent(DIR* , struct dir_inode* );
-void build_file_tree(struct dir_inode*);
-void print_tree(struct inode* , int );
+
+void open_dir(char* name, DIR** dest);
+//struct regular_file_inode* init_reg_file_inode(struct dirent* , struct inode* );
+void init_reg_file_inode(struct regular_file_inode** dest, struct dirent* source, struct inode* parent_dir);
+//struct dir_inode* init_dir_inode(const char* , struct inode* );
+void init_dir_inode(struct dir_inode** dest, const char* dir_name, struct inode* parent_dir);
+void walk_through_dir(DIR* dir, void (*f)(struct dirent*, void*), void* data);
+void implement_number_of_files_in_the_directory(struct dirent* dir_content, void* data);
+size_t count_files_in_the_directory(DIR* dir);
+void process_dir_child(struct dirent* dir_content, void* data);
+void process_dir(DIR* dir, struct dir_inode* parent);
+void init_parent(DIR* , struct dir_inode* parent);
+void build_file_tree(struct dir_inode* parent);
+void print_tree(struct inode* node, int space);
+void free_reg_file_inode(struct regular_file_inode* file_to_delete);
+void free_dir_inode(struct dir_inode* dir_to_delete);
+void free_tree(struct file_tree* tree);
 
 #endif
