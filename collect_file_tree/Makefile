@@ -32,13 +32,13 @@ $(BIN_DIR):
 $(DEBUG_DIR)/debug_main: $(DEBUG_DIR)/collect_file_tree.o \
 	$(DEBUG_DIR)/file_tree.o \
 	$(INCLUDES) $(BIN_DIR)
-	$(CC) -g $(CFLAGS) $(wordlist 1,2,$^) -o $@
+	$(CC) -Wall -g $(CFLAGS) $(wordlist 1,2,$^) -o $@
 	
 $(DEBUG_DIR)/file_tree.o: $(SRC_DIR)/file_tree.c $(INCLUDES) $(DEBUG_DIR)
-	$(CC) -g -c $(CFLAGS) $< -o $@
+	$(CC) -Wall -g -c $(CFLAGS) $< -o $@
 
 $(DEBUG_DIR)/collect_file_tree.o: $(SRC_DIR)/collect_file_tree.c $(INCLUDES) $(DEBUG_DIR)
-	$(CC) -g -c $(CFLAGS) $< -o $@
+	$(CC) -Wall -g -c $(CFLAGS) $< -o $@
 	
 $(DEBUG_DIR):
 	mkdir -p $(DEBUG_DIR)

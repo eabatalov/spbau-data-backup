@@ -37,16 +37,16 @@ struct dir_inode {
 };
 
 struct file_tree {
-	struct inode head;
+	struct inode* head;
 };
 
 
 void open_dir(char* name, DIR** dest);
 //struct regular_file_inode* init_reg_file_inode(struct dirent* , struct inode* );
-void init_reg_file_inode(struct regular_file_inode** dest, struct dirent* source, struct inode* parent_dir);
+void init_reg_file_inode(struct regular_file_inode* dest, struct dirent* source, struct inode* parent_dir);
 //struct dir_inode* init_dir_inode(const char* , struct inode* );
-void init_dir_inode(struct dir_inode** dest, const char* dir_name, struct inode* parent_dir);
-void walk_through_dir(DIR* dir, void (*f)(struct dirent*, void*), void* data);
+void init_dir_inode(struct dir_inode* dest, const char* dir_name, struct inode* parent_dir);
+void one_step_bfs_dir(DIR* dir, void (*f)(struct dirent*, void*), void* data);
 void implement_number_of_files_in_the_directory(struct dirent* dir_content, void* data);
 size_t count_files_in_the_directory(DIR* dir);
 void process_dir_child(struct dirent* dir_content, void* data);
