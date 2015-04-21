@@ -22,7 +22,7 @@ int get_length_of_name(struct inode* source) {
 	if(!source->parent) {
 		return strlen(source->name) + 1;
 	}
-	return get_length_of_name(source->parent) + 1;
+	return get_length_of_name(source->parent) + strlen(source->name) + 1;
 }
 
 void get_name(char* res, struct inode* source) {
@@ -57,7 +57,7 @@ void init_reg_file_inode(struct regular_file_inode* dest, struct dirent* source,
 	tmp_name = (char*)malloc(get_length_of_name(&(dest->inode)) * sizeof(char));
 	get_name(tmp_name, &(dest->inode));
 	
-	fprintf(stderr, "tmp_name: %p %s\n", tmp_name, tmp_name);
+	//fprintf(stderr, "tmp_name: %p %s\n", tmp_name, tmp_name);
 	
 	if(stat(tmp_name, &(dest->inode.attrs)) < 0) {
 		perror("Error: failed to get regular file statistics");
@@ -74,7 +74,7 @@ void init_dir_inode(struct dir_inode* dest, const char* dir_name, struct inode* 
 	
 	dest->inode.type = INODE_DIR;
 	
-	dest->inode.name = (char*)malloc(len * sizeof(char)/* + parent_dir_len*/);
+	dest->inode.name = (char*)malloc(len * sizeof(char));
 	if(!dest->inode.name) {
 		perror("Error: unable to allocate memory");
 		exit(1);
@@ -85,7 +85,7 @@ void init_dir_inode(struct dir_inode* dest, const char* dir_name, struct inode* 
 	tmp_name = (char*)malloc(get_length_of_name(&(dest->inode)) * sizeof(char));
 	get_name(tmp_name, &(dest->inode));
 	
-	fprintf(stderr, "tmp_name: %p %s\n", tmp_name, tmp_name);
+	//fprintf(stderr, "tmp_name: %p %s\n", tmp_name, tmp_name);
 	
 	if(stat(tmp_name, &(dest->inode.attrs)) < 0) {
 		perror("Error: failed to get regular file statistics");
@@ -137,7 +137,7 @@ void process_dir_child(struct dirent* dir_content, void* data) {
 		case DT_DIR:
 			if(strcmp(dir_content->d_name, ".") != 0 && strcmp(dir_content->d_name, "..") != 0) {
 				
-				tmp_dir = (struct dir_inode*)malloc(sizeof(struct regular_file_inode));
+				tmp_dir = (struct dir_inode*)malloc(sizeof(struct dir_inode));
 				if(!tmp_dir) {
 					perror("Error: failed to allocate memory");
 					exit(1);
@@ -198,6 +198,7 @@ void print_tree(struct inode* node, int space) {
 }
 
 void free_reg_file_inode(struct regular_file_inode* file_to_delete) {
+	free(file_to_delete->inode.name);
 	free(file_to_delete);
 }
 
@@ -214,9 +215,13 @@ void free_dir_inode(struct dir_inode* dir_to_delete) {
 			fprintf(stderr, "Something unidentified...\n");
 		}
 	}
+	free(dir_to_delete->inode.name);
+	if(dir_to_delete->children) {
+		free(dir_to_delete->children);
+	}
 	free(dir_to_delete);
 }
 
 void free_tree(struct file_tree* tree) {
-	free_dir_inode((struct dir_inode*)&(tree->head));
+	free_dir_inode((struct dir_inode*)(tree->head));
 }
