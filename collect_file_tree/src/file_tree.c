@@ -4,8 +4,17 @@
 #include <stdio.h>
 #include <dirent.h>
 #include <stdlib.h>
+#include <fs_tree.h>
 #include <file_tree_nodes.h>
 #include <string.h>
+
+#define ANSI_COLOR_RED "\x1b[31m"
+#define ANSI_COLOR_GREEN "\x1b[32m"
+#define ANSI_COLOR_YELLOW "\x1b[33m"
+#define ANSI_COLOR_BLUE "\x1b[34m"
+#define ANSI_COLOR_MAGENTA "\x1b[35m"
+#define ANSI_COLOR_CYAN "\x1b[36m"
+#define ANSI_COLOR_RESET "\x1b[0m" 
 
 void open_dir(char* name, DIR** dest) {
 	(*dest) = opendir(name);
@@ -57,7 +66,6 @@ void init_reg_file_inode(struct regular_file_inode* dest, struct dirent* source,
 	tmp_name = (char*)malloc(get_length_of_name(&(dest->inode)) * sizeof(char));
 	get_name(tmp_name, &(dest->inode));
 	
-	//fprintf(stderr, "tmp_name: %p %s\n", tmp_name, tmp_name);
 	
 	if(stat(tmp_name, &(dest->inode.attrs)) < 0) {
 		perror("Error: failed to get regular file statistics");
@@ -85,7 +93,6 @@ void init_dir_inode(struct dir_inode* dest, const char* dir_name, struct inode* 
 	tmp_name = (char*)malloc(get_length_of_name(&(dest->inode)) * sizeof(char));
 	get_name(tmp_name, &(dest->inode));
 	
-	//fprintf(stderr, "tmp_name: %p %s\n", tmp_name, tmp_name);
 	
 	if(stat(tmp_name, &(dest->inode.attrs)) < 0) {
 		perror("Error: failed to get regular file statistics");
@@ -175,6 +182,10 @@ void build_file_tree(struct dir_inode* parent) {
 	open_dir(tmp_name, &current_dir);
 	init_parent(current_dir, parent);
 
+	if(closedir(current_dir) < 0) {
+		perror("Error: problem while closing the directory\n");
+		exit(1);
+	}
 	free(tmp_name);
 }
 
@@ -222,6 +233,6 @@ void free_dir_inode(struct dir_inode* dir_to_delete) {
 	free(dir_to_delete);
 }
 
-void free_tree(struct file_tree* tree) {
+void free_tree(struct fs_tree* tree) {
 	free_dir_inode((struct dir_inode*)(tree->head));
 }

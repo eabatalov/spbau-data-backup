@@ -8,37 +8,11 @@
 #include <dirent.h>
 #include <stdlib.h>
 
-#define ANSI_COLOR_RED "\x1b[31m"
-#define ANSI_COLOR_GREEN "\x1b[32m"
-#define ANSI_COLOR_YELLOW "\x1b[33m"
-#define ANSI_COLOR_BLUE "\x1b[34m"
-#define ANSI_COLOR_MAGENTA "\x1b[35m"
-#define ANSI_COLOR_CYAN "\x1b[36m"
-#define ANSI_COLOR_RESET "\x1b[0m" 
 
-enum inode_type {INODE_REG_FILE, INODE_DEV_FILE, INODE_DIR, INODE_LINK, INODE_MOUNT_POINT, INODE_REG_FILE_DESCR};
-
-struct inode {
-	enum inode_type type;
-	char* name;
-	struct inode* parent;
-	struct stat attrs;
-	void* user_data;
-};
-
-struct regular_file_inode {
-	struct inode inode;
-};
-
-struct dir_inode {
-	struct inode inode;
-	size_t num_children;
-	struct inode** children;
-};
-
-struct fs_tree {
-	struct inode* head;
-};
+struct inode;
+struct regular_file_inode;
+struct dir_inode;
+struct fs_tree;
 
 
 void open_dir(char* name, DIR** dest);

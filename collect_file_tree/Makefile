@@ -1,53 +1,55 @@
-BIN_DIR=bin/
+LIB_NAME=libfstree
+LIB_STATIC=$(LIB_NAME).a
+LIB_SHARED=$(LIB_NAME).so
+
+BIN_DIR=./bin/
+RELEASE_DIR=$(BIN_DIR)/release/
+DEBUG_DIR=$(BIN_DIR)/debug/
 SRC_DIR=src/
-INCLUDE_DIR=include/
-CURRENT_DIR=./
-DEBUG_DIR=debug/
 
-BIN_MAIN=$(BIN_DIR)/collect_file_tree
+INTERFACE_INCLUDE_DIR=./include/
+INTERNAL_INCLUDE_DIR=./src/
 
-CFLAGS+=-Wall -Werror -I$(INCLUDE_DIR)
+CFLAGS+=-Wall -Werror -fPIC \
+	-I$(INTERFACE_INCLUDE_DIR) -I$(INTERNAL_INCLUDE_DIR)
+RELEASE_FLAGS=-O2
+DEBUG_FLAGS=-ggdb
 
 INCLUDES=\
-	$(INCLUDE_DIR)/file_tree_nodes.h
+	$(INTERFACE_INCLUDE_DIR)/fs_tree.h \
+	$(INTERNAL_INCLUDE_DIR)/file_tree_nodes.h
 
-all: $(BIN_MAIN)
+ifneq ($(DEBUG),)
+	TARGET_DIR+=$(DEBUG_DIR)
+	CFLAGS+=$(DEBUG_FLAGS)
+else
+	TARGET_DIR+=$(RELEASE_DIR)
+	CFLAGS+=$(RELEASE_FLAGS)
+endif
 
-$(BIN_MAIN): $(BIN_DIR)/collect_file_tree.o \
-	$(BIN_DIR)/file_tree.o \
-	$(INCLUDES) $(BIN_DIR)
-	$(CC) $(CFLAGS) $(wordlist 1,2,$^) -o $@
+OBJ_FILES=$(TARGET_DIR)/fs_tree.o $(TARGET_DIR)/file_tree.o
+LIBS=$(TARGET_DIR)/$(LIB_SHARED) $(TARGET_DIR)/$(LIB_STATIC)
 
-$(BIN_DIR)/collect_file_tree.o: $(SRC_DIR)/collect_file_tree.c \
-	$(INCLUDES) $(BIN_DIR)
-	$(CC) -c $(CFLAGS) $< -o $@
+all: $(LIBS)
 	
-$(BIN_DIR)/file_tree.o: $(SRC_DIR)/file_tree.c \
-	$(INCLUDES) $(BIN_DIR)
+$(TARGET_DIR)/$(LIB_SHARED): $(OBJ_FILES) $(TARGET_DIR)
+	gcc -shared $(OBJ_FILES) -o $@
+
+$(TARGET_DIR)/$(LIB_STATIC): $(OBJ_FILES) $(TARGET_DIR)
+	ar rcs $@ $(OBJ_FILES)
+
+$(TARGET_DIR)/fs_tree.o: $(SRC_DIR)/fs_tree.c \
+	$(INCLUDES) $(TARGET_DIR)
 	$(CC) -c $(CFLAGS) $< -o $@ 
 
-$(BIN_DIR):
-	mkdir -p $(BIN_DIR)
+$(TARGET_DIR)/file_tree.o: $(SRC_DIR)/file_tree.c \
+	$(INCLUDES) $(TARGET_DIR)
+	$(CC) -c $(CFLAGS) $< -o $@
 
-$(DEBUG_DIR)/debug_main: $(DEBUG_DIR)/collect_file_tree.o \
-	$(DEBUG_DIR)/file_tree.o \
-	$(INCLUDES) $(BIN_DIR)
-	$(CC) -Wall -g $(CFLAGS) $(wordlist 1,2,$^) -o $@
-	
-$(DEBUG_DIR)/file_tree.o: $(SRC_DIR)/file_tree.c $(INCLUDES) $(DEBUG_DIR)
-	$(CC) -Wall -g -c $(CFLAGS) $< -o $@
-
-$(DEBUG_DIR)/collect_file_tree.o: $(SRC_DIR)/collect_file_tree.c $(INCLUDES) $(DEBUG_DIR)
-	$(CC) -Wall -g -c $(CFLAGS) $< -o $@
-	
-$(DEBUG_DIR):
-	mkdir -p $(DEBUG_DIR)
+$(TARGET_DIR):
+	mkdir -p $(TARGET_DIR)
 
 clean:
 	rm -rf $(BIN_DIR)
-	rm -rf $(DEBUG_DIR)
 
-mem_check:
-	valgrind --leak-check=yes $(BIN_MAIN) $(CURRENT_DIR)
-
-.PHONY: clean mem_check
+.PHONY: clean
