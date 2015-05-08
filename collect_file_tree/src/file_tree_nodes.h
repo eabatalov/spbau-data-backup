@@ -7,18 +7,13 @@
 #include <stdio.h>
 #include <dirent.h>
 #include <stdlib.h>
-
-
-struct inode;
-struct regular_file_inode;
-struct dir_inode;
-struct fs_tree;
+#include <fs_tree.h>
 
 
 void open_dir(char* name, DIR** dest);
 int get_length_of_name(struct inode* source);
 void get_name(char* res, struct inode* source);
-void init_reg_file_inode(struct regular_file_inode* dest, struct dirent* source, struct inode* parent_dir);
+void init_reg_file_inode(struct regular_file_inode* dest, const char* source_name, struct inode* parent_dir);
 void init_dir_inode(struct dir_inode* dest, const char* dir_name, struct inode* parent_dir);
 void one_step_bfs_dir(DIR* dir, void (*f)(struct dirent*, void*), void* data);
 void implement_number_of_files_in_the_directory(struct dirent* dir_content, void* data);

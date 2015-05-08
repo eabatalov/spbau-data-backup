@@ -1,12 +1,8 @@
 #ifndef _FS_TREE_
 #define _FS_TREE_
 
-#include <sys/types.h>
 #include <sys/stat.h>
-#include <unistd.h>
-#include <stdio.h>
-#include <dirent.h>
-#include <stdlib.h>
+
 
 enum inode_type {INODE_REG_FILE, INODE_DEV_FILE, INODE_DIR, INODE_LINK, INODE_MOUNT_POINT, INODE_REG_FILE_DESCR};
 

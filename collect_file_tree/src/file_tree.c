@@ -49,20 +49,29 @@ void get_name(char* res, struct inode* source) {
 	return;
 }
 
-void init_reg_file_inode(struct regular_file_inode* dest, struct dirent* source, struct inode* parent_dir) {
-	size_t len = strlen(source->d_name) + 1;//+1 for terminating null-byte
-	char* tmp_name;
-	
-	dest->inode.type = INODE_REG_FILE;
-	
-	dest->inode.name = (char*)malloc(len * sizeof(char));
-	if(!dest->inode.name) {
+void init_inode(struct inode* dest, enum inode_type type, const char* name, struct inode* parent) {
+	size_t len = strlen(name) + 1;//+1 for terminating null-byte
+	dest->type = type;
+
+	dest->name = (char*)malloc(len * sizeof(char));
+	if(!dest->name) {
 		perror("Error: unable to allocate memory");
 		exit(1);
 	}
-	strcpy(dest->inode.name, source->d_name);
-		
-	dest->inode.parent = parent_dir;
+	strcpy(dest->name, name);
+	
+	dest->parent = parent;
+}
+
+void deinit_inode(struct inode* dest) {
+	free(dest->name);
+}
+
+void init_reg_file_inode(struct regular_file_inode* dest, const char* source_name, struct inode* parent_dir) {
+	char* tmp_name;
+
+	init_inode(&(dest->inode), INODE_REG_FILE, source_name, parent_dir);
+
 	tmp_name = (char*)malloc(get_length_of_name(&(dest->inode)) * sizeof(char));
 	get_name(tmp_name, &(dest->inode));
 	
@@ -77,19 +86,10 @@ void init_reg_file_inode(struct regular_file_inode* dest, struct dirent* source,
 }
 
 void init_dir_inode(struct dir_inode* dest, const char* dir_name, struct inode* parent_dir) {
-	size_t len = strlen(dir_name) + 1;
 	char* tmp_name;
-	
-	dest->inode.type = INODE_DIR;
-	
-	dest->inode.name = (char*)malloc(len * sizeof(char));
-	if(!dest->inode.name) {
-		perror("Error: unable to allocate memory");
-		exit(1);
-	}
-	strcpy(dest->inode.name, dir_name);
 
-	dest->inode.parent = parent_dir;
+	init_inode(&(dest->inode), INODE_DIR, dir_name, parent_dir);
+
 	tmp_name = (char*)malloc(get_length_of_name(&(dest->inode)) * sizeof(char));
 	get_name(tmp_name, &(dest->inode));
 	
@@ -138,7 +138,7 @@ void process_dir_child(struct dirent* dir_content, void* data) {
 				exit(1);
 			}
 
-			init_reg_file_inode(tmp_reg_file, dir_content, &(parent->inode));			
+			init_reg_file_inode(tmp_reg_file, dir_content->d_name, &(parent->inode));			
 			parent->children[parent->num_children++] = &(tmp_reg_file->inode);
 			break;
 		case DT_DIR:
@@ -209,7 +209,8 @@ void print_tree(struct inode* node, int space) {
 }
 
 void free_reg_file_inode(struct regular_file_inode* file_to_delete) {
-	free(file_to_delete->inode.name);
+//	free(file_to_delete->inode.name);
+	deinit_inode(&(file_to_delete->inode));
 	free(file_to_delete);
 }
 
@@ -226,7 +227,8 @@ void free_dir_inode(struct dir_inode* dir_to_delete) {
 			fprintf(stderr, "Something unidentified...\n");
 		}
 	}
-	free(dir_to_delete->inode.name);
+//	free(dir_to_delete->inode.name);
+	deinit_inode(&(dir_to_delete->inode));
 	if(dir_to_delete->children) {
 		free(dir_to_delete->children);
 	}
