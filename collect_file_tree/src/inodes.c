@@ -5,7 +5,7 @@
 #include <dirent.h>
 #include <stdlib.h>
 #include <fs_tree.h>
-#include <file_tree_nodes.h>
+#include <inodes.h>
 #include <string.h>
 
 #define ANSI_COLOR_RED "\x1b[31m"

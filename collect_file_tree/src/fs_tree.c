@@ -1,10 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <file_tree_nodes.h>
+#include <inodes.h>
 #include <fs_tree.h>
+/*
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+*/
 
 struct fs_tree* fs_tree_collect(const char* path) {
 	struct fs_tree* tree = (struct fs_tree*)malloc(sizeof(struct fs_tree));
@@ -60,6 +62,7 @@ void fs_tree_print(const struct fs_tree* tree) {
 	print_tree(tree->head, 0);
 }
 
+/*
 void dir_dfs(struct dir_inode* dir, fs_tree_inode_visitor visit, void* data) {
 	int i = 0;
 	int running = 1;
@@ -81,7 +84,9 @@ void fs_tree_dfs(struct fs_tree* fs_tree, fs_tree_inode_visitor visit, void* dat
 		visit(fs_tree->head, data);
 	}
 }
+*/
 
+/*
 int implement_number_of_files (struct inode* inode, void* data) {
 	size_t* cnt = (size_t*)data;
 	++(*cnt);
@@ -127,3 +132,4 @@ void fs_tree_bfs(struct fs_tree* fs_tree, fs_tree_inode_visitor visit, void* dat
 		visit(fs_tree->head, data);
 	}
 }
+*/

@@ -17,7 +17,7 @@ DEBUG_FLAGS=-ggdb
 
 INCLUDES=\
 	$(INTERFACE_INCLUDE_DIR)/fs_tree.h \
-	$(INTERNAL_INCLUDE_DIR)/file_tree_nodes.h
+	$(INTERNAL_INCLUDE_DIR)/inodes.h
 
 ifneq ($(DEBUG),)
 	TARGET_DIR+=$(DEBUG_DIR)
@@ -27,7 +27,7 @@ else
 	CFLAGS+=$(RELEASE_FLAGS)
 endif
 
-OBJ_FILES=$(TARGET_DIR)/fs_tree.o $(TARGET_DIR)/file_tree.o
+OBJ_FILES=$(TARGET_DIR)/fs_tree.o $(TARGET_DIR)/dfs.o $(TARGET_DIR)/bfs.o $(TARGET_DIR)/inodes.o
 LIBS=$(TARGET_DIR)/$(LIB_SHARED) $(TARGET_DIR)/$(LIB_STATIC)
 
 all: $(LIBS)
@@ -42,7 +42,16 @@ $(TARGET_DIR)/fs_tree.o: $(SRC_DIR)/fs_tree.c \
 	$(INCLUDES) $(TARGET_DIR)
 	$(CC) -c $(CFLAGS) $< -o $@ 
 
-$(TARGET_DIR)/file_tree.o: $(SRC_DIR)/file_tree.c \
+$(TARGET_DIR)/dfs.o: $(SRC_DIR)/dfs.c \
+	$(INCLUDES) $(TARGET_DIR)
+	$(CC) -c $(CFLAGS) $< -o $@ 
+
+$(TARGET_DIR)/bfs.o: $(SRC_DIR)/bfs.c \
+	$(INCLUDES) $(TARGET_DIR)
+	$(CC) -c $(CFLAGS) $< -o $@ 
+
+
+$(TARGET_DIR)/inodes.o: $(SRC_DIR)/inodes.c \
 	$(INCLUDES) $(TARGET_DIR)
 	$(CC) -c $(CFLAGS) $< -o $@
 
