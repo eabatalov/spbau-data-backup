@@ -3,6 +3,9 @@
 
 #include <sys/stat.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 enum inode_type {INODE_REG_FILE, INODE_DEV_FILE, INODE_DIR, INODE_LINK, INODE_MOUNT_POINT, INODE_REG_FILE_DESCR};
 
@@ -36,5 +39,8 @@ void fs_tree_print(const struct fs_tree *tree);
 void fs_tree_bfs(struct fs_tree* fs_tree, fs_tree_inode_visitor visitor, void* data);
 void fs_tree_dfs(struct fs_tree* fs_tree, fs_tree_inode_visitor visitor, void* data);
 
-
+#ifdef __cplusplus
+}
 #endif
+
+#endif // _FS_TREE_
