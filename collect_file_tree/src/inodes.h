@@ -23,10 +23,6 @@ void process_dir(DIR* dir, struct dir_inode* parent);
 void init_parent(DIR* , struct dir_inode* parent);
 void build_file_tree(struct dir_inode* parent);
 void print_tree(struct inode* node, int space);
-void free_reg_file_inode(struct regular_file_inode* file_to_delete);
-void free_dir_inode(struct dir_inode* dir_to_delete);
-void free_tree(struct fs_tree* tree);
-
 
 
 #endif

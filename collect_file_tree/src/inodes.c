@@ -132,7 +132,7 @@ void process_dir_child(struct dirent* dir_content, void* data) {
 	switch(dir_content->d_type) {
 		case DT_REG:
 
-			tmp_reg_file = (struct regular_file_inode*)malloc(sizeof(struct regular_file_inode));
+            tmp_reg_file = (struct regular_file_inode*)malloc(sizeof(struct regular_file_inode));
 			if(!tmp_reg_file) {
 				perror("Error: failed to allocate memory");
 				exit(1);
@@ -208,33 +208,3 @@ void print_tree(struct inode* node, int space) {
 	}
 }
 
-void free_reg_file_inode(struct regular_file_inode* file_to_delete) {
-//	free(file_to_delete->inode.name);
-	deinit_inode(&(file_to_delete->inode));
-	free(file_to_delete);
-}
-
-void free_dir_inode(struct dir_inode* dir_to_delete) {
-	int i = 0;
-	for(; i < dir_to_delete->num_children; i++) {
-		if(dir_to_delete->children[i]->type == INODE_DIR) {
-			free_dir_inode((struct dir_inode*)(dir_to_delete->children[i]));
-		}
-		else if(dir_to_delete->children[i]->type == INODE_REG_FILE){
-			free_reg_file_inode((struct regular_file_inode*)(dir_to_delete->children[i]));
-		}
-		else {
-			fprintf(stderr, "Something unidentified...\n");
-		}
-	}
-//	free(dir_to_delete->inode.name);
-	deinit_inode(&(dir_to_delete->inode));
-	if(dir_to_delete->children) {
-		free(dir_to_delete->children);
-	}
-	free(dir_to_delete);
-}
-
-void free_tree(struct fs_tree* tree) {
-	free_dir_inode((struct dir_inode*)(tree->head));
-}
