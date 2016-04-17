@@ -208,3 +208,56 @@ void print_tree(struct inode* node, int space) {
 	}
 }
 
+struct regular_file_inode* create_regular_file_inode() {
+    struct regular_file_inode* regular_file_inode = (struct regular_file_inode*)malloc(sizeof(struct regular_file_inode));
+    return regular_file_inode;
+}
+
+struct dir_inode* create_dir_inode() {
+    struct dir_inode* dir_inode = (struct dir_inode*)malloc(sizeof(struct dir_inode));
+    return dir_inode;
+}
+
+void free_reg_file_inode(struct regular_file_inode* file_to_delete) {
+//	free(file_to_delete->inode.name);
+    deinit_inode(&(file_to_delete->inode));
+    free(file_to_delete);
+}
+
+void free_dir_inode(struct dir_inode* dir_to_delete) {
+    int i = 0;
+    for(; i < dir_to_delete->num_children; i++) {
+        if(dir_to_delete->children[i]->type == INODE_DIR) {
+            free_dir_inode((struct dir_inode*)(dir_to_delete->children[i]));
+        }
+        else if(dir_to_delete->children[i]->type == INODE_REG_FILE){
+            free_reg_file_inode((struct regular_file_inode*)(dir_to_delete->children[i]));
+        }
+        else {
+            fprintf(stderr, "Something unidentified...\n");
+        }
+    }
+//	free(dir_to_delete->inode.name);
+    deinit_inode(&(dir_to_delete->inode));
+    if(dir_to_delete->children) {
+        free(dir_to_delete->children);
+    }
+    free(dir_to_delete);
+}
+
+void init_regular_file_inode_from_stat(struct regular_file_inode* dest, const char* name,
+                                       struct stat stat, struct inode* parent_dir) {
+    init_inode(&(dest->inode), INODE_REG_FILE, name, parent_dir);
+    dest->inode.attrs = stat;
+}
+
+void init_dir_inode_from_stat(struct dir_inode* dest, const char* name, struct stat stat,struct inode* parent_dir, size_t children_count) {
+    init_inode(&(dest->inode), INODE_DIR, name, parent_dir);
+    dest->inode.attrs = stat;
+    dest->num_children = children_count;
+    dest->children = (struct inode**)malloc(children_count * sizeof(struct inode*));
+}
+
+void init_fs_tree_from_head(struct fs_tree* dest, struct inode* head) {
+    dest->head = head;
+}

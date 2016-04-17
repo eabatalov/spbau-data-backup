@@ -49,7 +49,7 @@ struct stat get_stat_from_data(uid_t uid,  gid_t gid,  time_t atime,  time_t mti
 void init_regular_file_inode_from_stat(struct regular_file_inode* dest, const char* name,
                                        struct stat stat, struct inode* parent_dir);
 void init_dir_inode_from_stat(struct dir_inode* dest, const char* name, struct stat stat, struct inode* parent_dir, size_t children_count);
-void init_fs_tree_from_stat(struct fs_tree* dest, struct inode* head);
+void init_fs_tree_from_head(struct fs_tree* dest, struct inode* head);
 
 void free_reg_file_inode(struct regular_file_inode* file_to_delete);
 void free_dir_inode(struct dir_inode* dir_to_delete);
