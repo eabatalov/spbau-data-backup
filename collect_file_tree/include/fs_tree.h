@@ -53,7 +53,6 @@ void init_fs_tree_from_head(struct fs_tree* dest, struct inode* head);
 
 void free_reg_file_inode(struct regular_file_inode* file_to_delete);
 void free_dir_inode(struct dir_inode* dir_to_delete);
-void free_tree(struct fs_tree* tree);
 
 #ifdef __cplusplus
 }

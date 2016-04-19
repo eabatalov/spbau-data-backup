@@ -237,7 +237,6 @@ void free_dir_inode(struct dir_inode* dir_to_delete) {
             fprintf(stderr, "Something unidentified...\n");
         }
     }
-//	free(dir_to_delete->inode.name);
     deinit_inode(&(dir_to_delete->inode));
     if(dir_to_delete->children) {
         free(dir_to_delete->children);

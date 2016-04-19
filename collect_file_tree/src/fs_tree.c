@@ -44,7 +44,7 @@ struct fs_tree* fs_tree_collect(const char* path) {
 
 void fs_tree_destroy(struct fs_tree* tree) {
 	if(tree->head->type == INODE_DIR) {
-		free_tree(tree);
+		free_dir_inode((struct dir_inode*)(tree->head));
 	}
 	else if(tree->head->type == INODE_REG_FILE) {
 		free((struct regular_file_inode*)tree->head);
@@ -57,10 +57,6 @@ void fs_tree_print(const struct fs_tree* tree) {
 }
 
 struct fs_tree* create_fs_tree() {
-    struct fs_tree* tree = (struct fs_tree*)malloc(sizeof(struct fs_tree));
-    return tree;
-}
-
-void free_tree(struct fs_tree* tree) {
-    free_dir_inode((struct dir_inode*)(tree->head));
+	struct fs_tree* tree = (struct fs_tree*)malloc(sizeof(struct fs_tree));
+	return tree;
 }
