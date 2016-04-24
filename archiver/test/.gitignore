@@ -1,0 +1,8 @@
+test_archiver.pro.user
+Makefile
+~*
+*~
+bin/
+mocfiles/
+objectfiles/
+tests/

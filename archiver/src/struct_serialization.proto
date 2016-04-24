@@ -1,0 +1,30 @@
+package ArchiverUtils.protobufStructs;
+
+message PBRegFileMetaData {
+	required uint64 contentOffset = 1;
+	required uint64 contentSize = 2;
+}
+
+message PBDirMetaData {
+	repeated uint64 childIxs = 1;
+}
+
+message PBDirEntMetaData{
+	required uint64 uid = 1;
+	required uint64 gid = 2;
+	required uint64 mtime = 3;
+	required uint64 atime = 4;
+	required uint32 mode = 5;
+	required string name = 6;
+	
+	oneof extInfo {
+		PBRegFileMetaData pbRegFileMetaData = 7;
+		PBDirMetaData pbDirMetaData = 8;
+	}
+	
+	required uint64 parentIx = 9;
+}
+
+message PBArchiveMetaData{
+	repeated PBDirEntMetaData pbDirEntMetaData = 1;
+}
