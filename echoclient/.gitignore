@@ -1,0 +1,7 @@
+echoclient.pro.user
+Makefile
+~*
+*~
+bin/
+mocfiles/
+objectfiles/
