@@ -9,18 +9,18 @@ CONFIG -= app_bundle
 
 TEMPLATE = app
 
-SOURCES += src/main.cpp \
-    src/server.cpp \
-    src/servernetworkstream.cpp \
-    ../echoclient/src/networkstream.cpp \
-    src/perclient.cpp
+SOURCES += $$PWD/src/main.cpp \
+    $$PWD/src/server.cpp \
+    $$PWD/src/servernetworkstream.cpp \
+    $$PWD/../echoclient/src/networkstream.cpp \
+    $$PWD/src/perclient.cpp
 
 HEADERS += \
-    src/server.h \
-    src/servernetworkstream.h \
-    src/perclient.h \
-    ../echoclient/src/networkstream.h
+    $$PWD/src/server.h \
+    $$PWD/src/servernetworkstream.h \
+    $$PWD/src/perclient.h \
+    $$PWD/../echoclient/src/networkstream.h
 
-DESTDIR = ./bin
-OBJECTS_DIR = ./objectfiles
-MOC_DIR = ./mocfiles
+DESTDIR = $$PWD/bin
+OBJECTS_DIR = $$PWD/objectfiles
+MOC_DIR = $$PWD/mocfiles

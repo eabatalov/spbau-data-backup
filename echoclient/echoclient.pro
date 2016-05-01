@@ -9,17 +9,17 @@ CONFIG -= app_bundle
 
 TEMPLATE = app
 
-SOURCES += src/main.cpp \
-    src/consolestream.cpp \
-    src/networkstream.cpp \
-    src/echoclientlogic.cpp
+SOURCES += $$PWD/src/main.cpp \
+    $$PWD/src/consolestream.cpp \
+    $$PWD/src/networkstream.cpp \
+    $$PWD/src/echoclientlogic.cpp
 
 HEADERS += \
-    src/consolestream.h \
-    src/networkstream.h \
-    src/echoclientlogic.h
+    $$PWD/src/consolestream.h \
+    $$PWD/src/networkstream.h \
+    $$PWD/src/echoclientlogic.h
     
-DESTDIR = ./bin
-OBJECTS_DIR = ./objectfiles
-MOC_DIR = ./mocfiles
+DESTDIR = $$PWD/bin
+OBJECTS_DIR = $$PWD/objectfiles
+MOC_DIR = $$PWD/mocfiles
 
