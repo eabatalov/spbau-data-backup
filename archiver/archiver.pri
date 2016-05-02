@@ -12,8 +12,9 @@ SOURCES += $$PWD/src/archiver.cpp \
 HEADERS += $$PWD/src/archiver.h \
            $$PWD/gen/struct_serialization.pb.h \
            $$PWD/src/meta_pack.h \
-    $$PWD/src/archiver_utils.h
+           $$PWD/src/archiver_utils.h
 
-INCLUDEPATH += $$PWD/gen
+INCLUDEPATH += $$PWD/gen \
+               $$PWD/src
 
 DEPENDPATH += $$PWD/gen

@@ -1,0 +1,56 @@
+package networkUtils.protobufStructs;
+
+message LsClientRequest {
+	optional uint64 backupId = 1;
+}
+
+message ShortBackupInfo {
+	required uint64 backupId = 1;
+	required string path = 2;
+	required uint64 time = 3;
+}
+
+message LsSummaryServerAnswer
+{
+	repeated ShortBackupInfo shortBackupInfo = 1;
+}
+ 
+message LsDetailedServerAnswer
+{
+	required ShortBackupInfo shortBackupInfo = 1;
+	required string meta = 2;
+}
+
+
+
+message RestoreClientRequest {
+	required uint64 backupId = 1;
+}
+
+message RestoreServerAnswer {
+	required string meta = 1;
+	required string archive = 2;
+}
+
+message ClientReplyAfterRestore {
+	required bool isSuccess = 1;
+}
+
+
+
+message ClientBackupRequest {
+	required string path = 1;
+	required string archive = 2;
+	required string meta = 3;
+}
+
+message ServerBackupResult {
+	required uint64 backupId = 1;
+	required bool isSuccess = 2;
+}
+
+
+
+message ServerError {
+	required string errorMessage = 1;
+}
