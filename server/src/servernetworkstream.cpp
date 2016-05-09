@@ -35,20 +35,6 @@ ServerNetworkStream::~ServerNetworkStream()
     used = NULL;
 }
 
-void ServerNetworkStream::slotSendMessege(size_t clientNumber, QByteArray messege){
-    if (clientExist(clientNumber))
-        emit signalSendMessege(clientNumber, messege);
-    else
-        std::cerr << "Unknown client number (slotSendMessege): " << clientNumber << std::endl;
-}
-
-void ServerNetworkStream::slotReceiveMessege(size_t clientNumber, QByteArray messege){
-    if (clientExist(clientNumber))
-        emit signalReceiveMessege(clientNumber, messege);
-    else
-        std::cerr << "Unknown client number (slotReceiveMessege): " << clientNumber << std::endl;
-}
-
 bool ServerNetworkStream::clientExist(size_t clientNumber)
 {
     return (clientNumber < mMaxClientNumber && used[clientNumber]);
@@ -76,9 +62,6 @@ void ServerNetworkStream::slotNewConnection()
     used[clientNumber] = true;
     PerClient* perClient = new PerClient(clientNumber, newClient, this);
     mClients[clientNumber] = perClient;
-    connect(this, &ServerNetworkStream::signalSendMessege, perClient, &PerClient::slotSendClientMessege);
-    connect(perClient, &PerClient::newClientMessege, this, &ServerNetworkStream::slotReceiveMessege);
-    connect(perClient, &PerClient::releaseClientPlace, this, &ServerNetworkStream::releaseClientPlace);
 }
 
 void ServerNetworkStream::releaseClientPlace(size_t clientNumber)

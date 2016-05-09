@@ -29,20 +29,21 @@ NetworkStream::NetworkStream(QTcpSocket* tcpSocket, QObject *parent)
     connect(mTcpSocket, &QTcpSocket::connected, this, &NetworkStream::socketConnected);
 }
 
-void NetworkStream::sendMessage(const QString &message)
+void NetworkStream::sendMessage(const QByteArray &message)
 {
     QByteArray arrBlock;
     QDataStream out(&arrBlock, QIODevice::ReadWrite);
     out.setVersion(QDataStream::Qt_4_0);
-    out << quint16(0) << message;
+
+    out << quint64(0) << message;
     out.device()->seek(0);
-    out << quint16(arrBlock.size() - sizeof(quint16));
+    out << quint64(arrBlock.size() - sizeof(quint64));
     mTcpSocket->write(arrBlock);
 }
 
 void NetworkStream::receiveMessage()
 {
-    QString message;
+    QByteArray message;
     QDataStream in(mTcpSocket);
     in.setVersion(QDataStream::Qt_4_0);
 
@@ -50,7 +51,7 @@ void NetworkStream::receiveMessage()
     {
         if (!mNextBlockSize)
         {
-            if ((size_t)mTcpSocket->bytesAvailable() < sizeof(quint16)) {
+            if ((size_t)mTcpSocket->bytesAvailable() < sizeof(quint64)) {
                 break;
             }
             in >> mNextBlockSize;
@@ -87,7 +88,7 @@ void NetworkStream::displayError(QAbstractSocket::SocketError socketError)
 
 }
 
-void NetworkStream::sendNetMessage(const QString &message)
+void NetworkStream::sendNetMessage(const QByteArray &message)
 {
     sendMessage(message);
 }

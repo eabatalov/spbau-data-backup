@@ -9,7 +9,7 @@ Server::Server(ServerNetworkStream* serverNetworkStream, QObject *parent)
     connect(serverNetworkStream, &ServerNetworkStream::signalReceiveMessege, this, &Server::receiveMessege);
 }
 
-void Server::receiveMessege(size_t clientNumber, QString messege)
+void Server::receiveMessege(size_t clientNumber, QByteArray messege)
 {
     std::cout << clientNumber << ": " << messege.toStdString() << std::endl;
     emit sendMessege(clientNumber, messege);

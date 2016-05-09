@@ -21,7 +21,7 @@ void EchoClientLogic::readFromConsole(const std::string &message)
         mEchoClientState = WAIT_SERVER_ECHO;
         if (message == "exit")
             exit(0);
-        mLastSentMessage = QString::fromStdString(message);
+        mLastSentMessage = QByteArray::fromStdString(message);
         emit writeToNetwork(mLastSentMessage);
     } else
     {
@@ -30,7 +30,7 @@ void EchoClientLogic::readFromConsole(const std::string &message)
     }
 }
 
-void EchoClientLogic::readFromNetwork(const QString &message)
+void EchoClientLogic::readFromNetwork(const QByteArray &message)
 {
     if (mEchoClientState == WAIT_SERVER_ECHO)
     {

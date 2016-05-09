@@ -8,13 +8,13 @@ PerClient::PerClient(size_t clientNumber, QTcpSocket* clientSocket, QObject *par
     connect(clientSocket, &QTcpSocket::disconnected, this, &PerClient::disconnectSocket);
 }
 
-void PerClient::slotSendClientMessege(size_t clientNumber, const QString & message)
+void PerClient::slotSendClientMessege(size_t clientNumber, const QByteArray &message)
 {
    if (clientNumber == mClientNumber)
        this->sendMessage(message);
 }
 
-void PerClient::slotNewNetMessege(const QString & message)
+void PerClient::slotNewNetMessege(const QByteArray &message)
 {
     emit newClientMessege(mClientNumber, message);
 }

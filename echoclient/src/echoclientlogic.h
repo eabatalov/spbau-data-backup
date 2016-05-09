@@ -21,15 +21,15 @@ private:
         WAIT_SERVER_ECHO,
         ABORTED
     } mEchoClientState;
-    QString mLastSentMessage;
+    QByteArray mLastSentMessage;
 
 signals:
     void writeToConsole(const std::string& message);
-    void writeToNetwork(const QString & message);
+    void writeToNetwork(const QByteArray & message);
 
 private slots:
     void readFromConsole(const std::string& message);
-    void readFromNetwork(const QString & message);
+    void readFromNetwork(const QByteArray & message);
     void starting();
 
 };

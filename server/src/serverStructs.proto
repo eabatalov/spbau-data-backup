@@ -1,0 +1,13 @@
+package serverUtils.protobufStructs;
+
+message ServerMetadataForArchive {
+	required uint64 id = 1;
+	required string origianlPath = 2;
+	required uint64 creationTime = 3;
+	required uint64	succRestoresCnt = 4;
+	required uint64 failRestoresCnt = 5;
+}
+
+message VectorOfServerMetadataForArchive {
+	repeated ServerMetadataForArchive metadatas = 1;
+}

@@ -34,20 +34,20 @@ private:
     void sendRestoreResult(bool restoreResult);
 
     //ReceiveNetMessage:
-    void OnDetailedLs(const std::string& buffer);
-    void OnSummaryLs(const std::string& buffer);
-    void OnReceiveArchiveToRestore(const std::string& buffer);
-    void OnReceiveBackupResults(const std::string& buffer);
-    void OnServerError(const std::string& buffer);
+    void OnDetailedLs(const char *buffer, uint64_t bufferSize);
+    void OnSummaryLs(const char *buffer, uint64_t bufferSize);
+    void OnReceiveArchiveToRestore(const char *buffer, uint64_t bufferSize);
+    void OnReceiveBackupResults(const char *buffer, uint64_t bufferSize);
+    void OnServerError(const char *buffer, uint64_t bufferSize);
 
     std::string restorePath;
 signals:
     void sigWriteToConsole(const std::string& message);
-    void sigWriteToNetwork(const QString & message);
+    void sigWriteToNetwork(const QByteArray & message);
 
 private slots:
     void slotReadFromConsole(const std::string& message);
-    void slotReadFromNetwork(const QString & message);
+    void slotReadFromNetwork(const QByteArray & message);
     void slotStarting();
 
 };

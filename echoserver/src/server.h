@@ -14,13 +14,13 @@ private:
 
 
 signals:
-    void sendMessege(size_t clientNumber, QString messege);
+    void sendMessege(size_t clientNumber, QByteArray messege);
 
 public slots:
 
 
 private slots:
-    void receiveMessege(size_t clientNumber, QString messege);
+    void receiveMessege(size_t clientNumber, QByteArray messege);
 
 };
 

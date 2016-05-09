@@ -71,27 +71,25 @@ void ClientLogic::slotReadFromConsole(const std::string& message)
 }
 
 
-void ClientLogic::slotReadFromNetwork(const QString & message)
+void ClientLogic::slotReadFromNetwork(const QByteArray &message)
 {
-    std::string str = message.toStdString();
-    utils::commandType cmd = *((utils::commandType*)str.c_str());
-    std::string buffer = str.substr(utils::commandSize);
+    utils::commandType cmd = *((utils::commandType*)message.data());
     switch (cmd)
     {
     case utils::ansToLsSummary:
-        OnSummaryLs(buffer);
+        OnSummaryLs(message.data()+utils::commandSize, message.size()-utils::commandSize);
         break;
     case utils::ansToLsDetailed:
-        OnDetailedLs(buffer);
+        OnDetailedLs(message.data()+utils::commandSize, message.size()-utils::commandSize);
         break;
     case utils::ansToBackup:
-        OnReceiveBackupResults(buffer);
+        OnReceiveBackupResults(message.data()+utils::commandSize, message.size()-utils::commandSize);
         break;
     case utils::ansToRestore:
-        OnReceiveArchiveToRestore(buffer);
+        OnReceiveArchiveToRestore(message.data()+utils::commandSize, message.size()-utils::commandSize);
         break;
     case utils::serverExit:
-        OnServerError(buffer);
+        OnServerError(message.data()+utils::commandSize, message.size()-utils::commandSize);
         break;
     default:
         std::cerr << "Unsupported command from server." << std::endl;
@@ -120,22 +118,34 @@ void ClientLogic::sendLsFromClient(networkUtils::protobufStructs::LsClientReques
         std::cerr << "Error with serialization LS cmd." << std::endl;
         return;
     }
-    std::vector<char> message(serializationLs.size() + utils::commandSize);
+
+    std::vector<char> message(ls.ByteSize() + utils::commandSize);
     utils::commandType cmd = utils::toFixedType(utils::ls);
-    std::memcpy(message.data(), (char*)&cmd, utils::commandSize);
-    std::memcpy(message.data() + utils::commandSize, serializationLs.c_str(), serializationLs.size());
-    emit sigWriteToNetwork(QString(message.data()));
+    std::memcpy(&message.front(), (char*)&cmd, utils::commandSize);
+    std::memcpy(&message.front() + utils::commandSize, serializationLs.c_str(), ls.ByteSize());
+
+    std::cout << "Bytes: " << ls.ByteSize() << std::endl;
+    std::cout << serializationLs.length() << std::endl;
+    std::cout << serializationLs << std::endl;
+    std::cout << message.size() << std::endl;
+
+    QByteArray str = QByteArray(message.data(), message.size());
+    std::cout << str.size() << std::endl;
+    emit sigWriteToNetwork(str);
 }
 
 void ClientLogic::askLs()
 {
     networkUtils::protobufStructs::LsClientRequest ls;
+    ls.set_isls(1);
     sendLsFromClient(ls);
+    mClientState = WAIT_LS_RESULT;
 }
 
 void ClientLogic::askLs(const std::string& command)
 {
     networkUtils::protobufStructs::LsClientRequest ls;
+    ls.set_isls(1);
     std::uint64_t backupId = 0;
     for (int i = 0; i < command.size(); ++i)
     {
@@ -148,6 +158,7 @@ void ClientLogic::askLs(const std::string& command)
     }
     ls.set_backupid(backupId);
     sendLsFromClient(ls);
+    mClientState = WAIT_LS_RESULT;
 }
 
 void ClientLogic::makeRestoreRequest(const std::string& command)
@@ -185,7 +196,9 @@ void ClientLogic::makeRestoreRequest(const std::string& command)
     utils::commandType cmd = utils::toFixedType(utils::restore);
     std::memcpy(message.data(), (char*)&cmd, utils::commandSize);
     std::memcpy(message.data() + utils::commandSize, serializatedRestoreRequest.c_str(), serializatedRestoreRequest.size());
-    emit sigWriteToNetwork(QString(message.data()));
+    emit sigWriteToNetwork(QByteArray(message.data()));
+
+    mClientState = WAIT_RESTORE_RESULT;
 }
 
 void ClientLogic::makeBackup(const std::string& command)
@@ -210,7 +223,9 @@ void ClientLogic::makeBackup(const std::string& command)
     utils::commandType cmd = utils::toFixedType(utils::backup);
     std::memcpy(message.data(), (char*)&cmd, utils::commandSize);
     std::memcpy(message.data() + utils::commandSize, serializatedBackupRequest.c_str(), serializatedBackupRequest.size());
-    emit sigWriteToNetwork(QString(message.data()));
+    emit sigWriteToNetwork(QByteArray(message.data()));
+
+    mClientState = WAIT_BACKUP_RESULT;
 }
 
 void ClientLogic::sendRestoreResult(bool restoreResult)
@@ -228,7 +243,7 @@ void ClientLogic::sendRestoreResult(bool restoreResult)
     utils::commandType cmd = utils::toFixedType(utils::replyAfterRestore);
     std::memcpy(message.data(), (char*)&cmd, utils::commandSize);
     std::memcpy(message.data() + utils::commandSize, serializedReply.c_str(), serializedReply.size());
-    emit sigWriteToNetwork(QString(message.data()));
+    emit sigWriteToNetwork(QByteArray(message.data()));
 }
 
 std::string inttostr(std::uint64_t number)
@@ -250,75 +265,107 @@ std::string shortBackupInfoToString(const networkUtils::protobufStructs::ShortBa
     return inttostr(backupInfo.backupid()) + " " + backupInfo.path() + " " + ctime(&time);
 }
 
-void ClientLogic::OnDetailedLs(const std::string& buffer)
+void ClientLogic::OnDetailedLs(const char *buffer, uint64_t bufferSize)
 {
-    networkUtils::protobufStructs::LsDetailedServerAnswer lsDetailed;
-    lsDetailed.ParseFromString(buffer);
-    //TODO: add fstree
-    emit sigWriteToConsole(shortBackupInfoToString(lsDetailed.shortbackupinfo()));
-}
-
-void ClientLogic::OnSummaryLs(const std::string& buffer)
-{
-    networkUtils::protobufStructs::LsSummaryServerAnswer lsSummary;
-    lsSummary.ParseFromString(buffer);
-    std::string ans;
-    for (int i = 0; i < lsSummary.shortbackupinfo_size(); ++i)
+    if (mClientState == WAIT_LS_RESULT)
     {
-        ans += shortBackupInfoToString(lsSummary.shortbackupinfo(i)) + "\n";
-    }
-    ans += lsSummary.shortbackupinfo_size() + " backups.";
-    emit sigWriteToConsole(ans);
-}
-
-void ClientLogic::OnReceiveArchiveToRestore(const std::string& buffer)
-{
-    networkUtils::protobufStructs::RestoreServerAnswer restoreAnswer;
-    restoreAnswer.ParseFromString(buffer);
-
-    QFile meta("curunpack.pckmeta");
-    QFile content("curunpack.pckcontent");
-    meta.open(QIODevice::WriteOnly);
-    content.open(QIODevice::WriteOnly);
-    content.write(restoreAnswer.archive().c_str(), restoreAnswer.archive().size());
-    content.write(restoreAnswer.meta().c_str(), restoreAnswer.meta().size());
-
-    QFileInfo qfileinfo(restorePath.c_str());
-    if (qfileinfo.isDir())
-    {
-        Archiver::unpack("curunpack.pck", restorePath.c_str());
-        sendRestoreResult(1);
+        networkUtils::protobufStructs::LsDetailedServerAnswer lsDetailed;
+        lsDetailed.ParseFromArray(buffer, bufferSize);
+        //TODO: add fstree
+        emit sigWriteToConsole(shortBackupInfoToString(lsDetailed.shortbackupinfo()));
+        mClientState = WAIT_USER_INPUT;
     }
     else
     {
-        std::cerr << restorePath << " isn't directory." << std::endl;
-        sendRestoreResult(0);
+        std::cerr << "Unexpected DETAILED_LS_RESULT" << std::endl;
     }
-
-    //TODO: make more meaningful
-    //sendRestoreResult(1);
-
 }
 
-void ClientLogic::OnReceiveBackupResults(const std::string& buffer)
+void ClientLogic::OnSummaryLs(const char *buffer, uint64_t bufferSize)
 {
-    networkUtils::protobufStructs::ServerBackupResult backupResult;
-    backupResult.ParseFromString(buffer);
-    if (backupResult.issuccess())
+    if (mClientState == WAIT_LS_RESULT)
     {
-        emit sigWriteToConsole("Backup was succed. BackupId = " + inttostr(backupResult.backupid()));
+        networkUtils::protobufStructs::LsSummaryServerAnswer lsSummary;
+        lsSummary.ParseFromArray(buffer, bufferSize);
+        std::string ans;
+        for (int i = 0; i < lsSummary.shortbackupinfo_size(); ++i)
+        {
+            ans += shortBackupInfoToString(lsSummary.shortbackupinfo(i)) + "\n";
+        }
+        ans += lsSummary.shortbackupinfo_size() + " backups.";
+        emit sigWriteToConsole(ans);
+        mClientState = WAIT_USER_INPUT;
     }
     else
     {
-        emit sigWriteToConsole("Backup wasn't succed.");
+        std::cerr << "Unexpected SUMMURY_LS_RESULT" << std::endl;
+    }
+}
+
+void ClientLogic::OnReceiveArchiveToRestore(const char *buffer, uint64_t bufferSize)
+{
+    if (mClientState == WAIT_RESTORE_RESULT)
+    {
+        networkUtils::protobufStructs::RestoreServerAnswer restoreAnswer;
+        restoreAnswer.ParseFromArray(buffer, bufferSize);
+
+        QFile meta("curunpack.pckmeta");
+        QFile content("curunpack.pckcontent");
+        meta.open(QIODevice::WriteOnly);
+        content.open(QIODevice::WriteOnly);
+        content.write(restoreAnswer.archive().c_str(), restoreAnswer.archive().size());
+        content.write(restoreAnswer.meta().c_str(), restoreAnswer.meta().size());
+
+        QFileInfo qfileinfo(restorePath.c_str());
+        if (qfileinfo.isDir())
+        {
+            Archiver::unpack("curunpack.pck", restorePath.c_str());
+            sendRestoreResult(1);
+        }
+        else
+        {
+            std::cerr << restorePath << " isn't directory." << std::endl;
+            sendRestoreResult(0);
+        }
+
+        //TODO: make more meaningful
+        //sendRestoreResult(1);
+        mClientState = WAIT_USER_INPUT;
+    }
+    else
+    {
+        std::cerr << "Unexpected RESTORE_RESULT" << std::endl;
     }
 
 }
 
-void ClientLogic::OnServerError(const std::string& buffer)
+void ClientLogic::OnReceiveBackupResults(const char *buffer, uint64_t bufferSize)
+{
+    if (mClientState == WAIT_BACKUP_RESULT)
+    {
+        networkUtils::protobufStructs::ServerBackupResult backupResult;
+        backupResult.ParseFromArray(buffer, bufferSize);
+        if (backupResult.issuccess())
+        {
+            emit sigWriteToConsole("Backup was succed. BackupId = " + inttostr(backupResult.backupid()));
+        }
+        else
+        {
+            emit sigWriteToConsole("Backup wasn't succed.");
+        }
+        mClientState = WAIT_USER_INPUT;
+    }
+    else
+    {
+        std::cerr << "Unexpected BACKUP_RESULT" << std::endl;
+    }
+
+}
+
+void ClientLogic::OnServerError(const char *buffer, uint64_t bufferSize)
 {
     networkUtils::protobufStructs::ServerError serverError;
-    serverError.ParseFromString(buffer);
+    serverError.ParseFromArray(buffer, bufferSize);
     emit sigWriteToConsole("Server error: " + serverError.errormessage() + "\nState is aborted.");
     mClientState = ABORTED;
 }

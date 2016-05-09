@@ -1,0 +1,8 @@
+server.pro.user
+Makefile
+~*
+*~
+bin/
+mocfiles/
+objectfiles/
+gen/

@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QTcpSocket>
 #include <QDataStream>
+#include <QByteArray>
 #include <string>
 #include "../../common/protocol.h"
 
@@ -16,18 +17,18 @@ public:
 
 private:
     QTcpSocket* mTcpSocket;
-    quint16 mNextBlockSize;
+    quint64 mNextBlockSize;
 
 protected:
-    void sendMessage(const QString & message);
+    void sendMessage(const QByteArray & message);
 
 signals:
-    void newNetMessage(const QString & message);
+    void newNetMessage(const QByteArray & message);
     void connected();
 
 public slots:
     void receiveMessage();
-    void sendNetMessage(const QString & message);
+    void sendNetMessage(const QByteArray & message);
 
 private slots:
     void displayError(QAbstractSocket::SocketError socketError);

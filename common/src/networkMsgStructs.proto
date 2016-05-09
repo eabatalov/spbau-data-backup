@@ -2,6 +2,7 @@ package networkUtils.protobufStructs;
 
 message LsClientRequest {
 	optional uint64 backupId = 1;
+	required bool isLS = 2;
 }
 
 message ShortBackupInfo {

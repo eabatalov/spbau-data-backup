@@ -14,14 +14,14 @@ private:
     size_t mClientNumber;
 
 signals:
-    void newClientMessege(size_t clientNumber, const QString & message);
+    void newClientMessege(size_t clientNumber, const QByteArray & message);
     void releaseClientPlace(size_t clientNumber);
 
 public slots:
-    void slotSendClientMessege(size_t clientNumber, const QString & message);
+    void slotSendClientMessege(size_t clientNumber, const QByteArray & message);
 
 private slots:
-    void slotNewNetMessege(const QString & message);
+    void slotNewNetMessege(const QByteArray & message);
     void disconnectSocket();
 };
 

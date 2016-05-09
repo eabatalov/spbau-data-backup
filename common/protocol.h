@@ -26,7 +26,7 @@ namespace utils{
         serverExit
     };
 
-    inline uint8_t toFixedType(ClientCommandId cmd){
+    inline commandType toFixedType(ClientCommandId cmd){
         return cmd;
     }
 

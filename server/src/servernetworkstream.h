@@ -23,15 +23,10 @@ private:
     bool clientExist(size_t clientNumber);
 
 signals:
-    void signalSendMessege(size_t clientNumber, QByteArray messege);
-    void signalReceiveMessege(size_t clientNumber, QByteArray messege);
-
 
 public slots:
-    void slotSendMessege(size_t clientNumber, QByteArray messege);
 
 private slots:
-    void slotReceiveMessege(size_t clientNumber, QByteArray messege);
     void slotNewConnection();
     void releaseClientPlace(size_t clientNumber);
 };
