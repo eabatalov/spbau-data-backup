@@ -25,16 +25,16 @@ INCLUDEPATH += $$PWD/../echoclient/src \
                $$PWD/gen
 
 SOURCES += $$PWD/src/main.cpp \
-           $$PWD/src/servernetworkstream.cpp \
+           $$PWD/src/serverclientmanager.cpp \
            $$PWD/../echoclient/src/networkstream.cpp \
-           $$PWD/src/perclient.cpp \
+           $$PWD/src/clientsessiononserver.cpp \
            $$PWD/../common/gen/networkMsgStructs.pb.cc \
            $$PWD/gen/serverStructs.pb.cc
 
 
 HEADERS += \
-    $$PWD/src/servernetworkstream.h \
-    $$PWD/src/perclient.h \
+    $$PWD/src/serverclientmanager.h \
+    $$PWD/src/clientsessiononserver.h \
     $$PWD/../echoclient/src/networkstream.h \
     $$PWD/../common/protocol.h \
     $$PWD/../common/gen/networkMsgStructs.pb.h \

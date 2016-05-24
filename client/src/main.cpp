@@ -1,5 +1,5 @@
 #include <QCoreApplication>
-#include "clientlogic.h"
+#include "clientsession.h"
 #include "consolestream.h"
 #include "networkstream.h"
 #include <iostream>
@@ -14,7 +14,7 @@ int main(int argc, char *argv[])
     QCoreApplication app(argc, argv);
     NetworkStream* networkStream = new NetworkStream(QHostAddress(HOST_ADDRESS), PORT_NUMBER, &app);
     ConsoleStream* consoleStream = new ConsoleStream(&app);
-    ClientLogic* clientLogic = new ClientLogic(networkStream, consoleStream, &app);
+    ClientSession* clientSession = new ClientSession(networkStream, consoleStream, &app);
     
     //TODO:
     //google::protobuf::ShutdownProtobufLibrary();

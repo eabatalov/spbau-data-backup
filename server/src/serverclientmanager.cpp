@@ -1,12 +1,12 @@
-#include "servernetworkstream.h"
-#include "perclient.h"
+#include "serverclientmanager.h"
+#include "clientsessiononserver.h"
 #include <iostream>
 
-ServerNetworkStream::ServerNetworkStream(size_t maxClientNumber, QHostAddress adress, quint16 port, QObject *parent)
+ServerClientManager::ServerClientManager(size_t maxClientNumber, QHostAddress adress, quint16 port, QObject *parent)
     : QObject(parent)
     , mMaxClientNumber(maxClientNumber)
 {
-    mClients = new PerClient*[mMaxClientNumber];
+    mClients = new ClientSessionOnServer*[mMaxClientNumber];
     used = new bool[mMaxClientNumber];
     for (size_t i = 0; i < mMaxClientNumber; ++i)
     {
@@ -22,10 +22,10 @@ ServerNetworkStream::ServerNetworkStream(size_t maxClientNumber, QHostAddress ad
     else
         std::cout << "Start listening" << std::endl;
 
-    connect(mTcpServer, &QTcpServer::newConnection, this, &ServerNetworkStream::slotNewConnection);
+    connect(mTcpServer, &QTcpServer::newConnection, this, &ServerClientManager::onNewConnection);
 }
 
-ServerNetworkStream::~ServerNetworkStream()
+ServerClientManager::~ServerClientManager()
 {
     delete mClients;
     delete used;
@@ -35,12 +35,12 @@ ServerNetworkStream::~ServerNetworkStream()
     used = NULL;
 }
 
-bool ServerNetworkStream::clientExist(size_t clientNumber)
+bool ServerClientManager::clientExist(size_t clientNumber)
 {
     return (clientNumber < mMaxClientNumber && used[clientNumber]);
 }
 
-void ServerNetworkStream::slotNewConnection()
+void ServerClientManager::onNewConnection()
 {
     QTcpSocket* newClient = mTcpServer->nextPendingConnection();
     bool canAdd = false;
@@ -60,11 +60,11 @@ void ServerNetworkStream::slotNewConnection()
     }
 
     used[clientNumber] = true;
-    PerClient* perClient = new PerClient(clientNumber, newClient, this);
+    ClientSessionOnServer* perClient = new ClientSessionOnServer(clientNumber, newClient, this);
     mClients[clientNumber] = perClient;
 }
 
-void ServerNetworkStream::releaseClientPlace(size_t clientNumber)
+void ServerClientManager::releaseClientPlace(size_t clientNumber)
 {
     mClients[clientNumber] = NULL;
     used[clientNumber] = false;

@@ -3,6 +3,8 @@
 #include <QString>
 #include <QHostAddress>
 #include <cassert>
+#include <QByteArray>
+
 
 NetworkStream::NetworkStream(const QHostAddress &address, quint16 port, QObject *parent)
     : QObject(parent)

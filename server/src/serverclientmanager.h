@@ -6,19 +6,19 @@
 #include <QTcpSocket>
 #include <QDataStream>
 #include <QHostAddress>
-#include "perclient.h"
+#include "clientsessiononserver.h"
 
-class ServerNetworkStream : public QObject
+class ServerClientManager : public QObject
 {
     Q_OBJECT
 public:
-    explicit ServerNetworkStream(size_t maxClientNumber, QHostAddress adress, quint16 port,QObject *parent = 0);
-    ~ServerNetworkStream();
+    explicit ServerClientManager(size_t maxClientNumber, QHostAddress adress, quint16 port,QObject *parent = 0);
+    ~ServerClientManager();
 
 private:
     QTcpServer* mTcpServer;
     size_t mMaxClientNumber;
-    PerClient** mClients;
+    ClientSessionOnServer** mClients;
     bool* used;
     bool clientExist(size_t clientNumber);
 
@@ -27,7 +27,7 @@ signals:
 public slots:
 
 private slots:
-    void slotNewConnection();
+    void onNewConnection();
     void releaseClientPlace(size_t clientNumber);
 };
 

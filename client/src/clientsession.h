@@ -7,11 +7,11 @@
 #include "networkstream.h"
 #include "consolestream.h"
 
-class ClientLogic : public QObject
+class ClientSession : public QObject
 {
     Q_OBJECT
 public:
-    explicit ClientLogic(NetworkStream* networkStream, ConsoleStream* consoleStream, QObject *parent = 0);
+    explicit ClientSession(NetworkStream* networkStream, ConsoleStream* consoleStream, QObject *parent = 0);
 
 private:
     NetworkStream* mNetworkStream;
@@ -22,7 +22,8 @@ private:
         WAIT_LS_RESULT,
         WAIT_RESTORE_RESULT,
         WAIT_BACKUP_RESULT,
-        ABORTED
+        ABORTED,
+        FINISHED
     } mClientState;
 
     //SendNetMessage:
@@ -32,6 +33,7 @@ private:
     void makeBackup(const std::string& command);
     void sendLsFromClient(networkUtils::protobufStructs::LsClientRequest ls);
     void sendRestoreResult(bool restoreResult);
+    void sendSerializatedMessage(const std::string& binaryMessage, utils::commandType cmdType, int messageSize);
 
     //ReceiveNetMessage:
     void OnDetailedLs(const char *buffer, uint64_t bufferSize);
@@ -40,15 +42,16 @@ private:
     void OnReceiveBackupResults(const char *buffer, uint64_t bufferSize);
     void OnServerError(const char *buffer, uint64_t bufferSize);
 
+
     std::string restorePath;
 signals:
     void sigWriteToConsole(const std::string& message);
     void sigWriteToNetwork(const QByteArray & message);
 
 private slots:
-    void slotReadFromConsole(const std::string& message);
-    void slotReadFromNetwork(const QByteArray & message);
-    void slotStarting();
+    void onConsoleInput(const std::string& message);
+    void onNetworkInput(const QByteArray & message);
+    void onStart();
 
 };
 

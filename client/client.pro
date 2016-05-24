@@ -27,13 +27,13 @@ INCLUDEPATH += $$PWD/../echoclient/src \
 SOURCES += $$PWD/src/main.cpp \
            $$PWD/../echoclient/src/consolestream.cpp \
            $$PWD/../echoclient/src/networkstream.cpp \
-           $$PWD/src/clientlogic.cpp \
+           $$PWD/src/clientsession.cpp \
            $$PWD/../common/gen/networkMsgStructs.pb.cc
 
 HEADERS += \
     $$PWD/../echoclient/src/consolestream.h \
     $$PWD/../echoclient/src/networkstream.h \
-    $$PWD/src/clientlogic.h \
+    $$PWD/src/clientsession.h \
     $$PWD/src/client_utils.h \
     $$PWD/../common/protocol.h \
     $$PWD/../common/gen/networkMsgStructs.pb.h

@@ -19,7 +19,7 @@ message LsSummaryServerAnswer
 message LsDetailedServerAnswer
 {
 	required ShortBackupInfo shortBackupInfo = 1;
-	required string meta = 2;
+	required bytes meta = 2;
 }
 
 
@@ -29,8 +29,8 @@ message RestoreClientRequest {
 }
 
 message RestoreServerAnswer {
-	required string meta = 1;
-	required string archive = 2;
+	required bytes meta = 1;
+	required bytes archive = 2;
 }
 
 message ClientReplyAfterRestore {
@@ -41,8 +41,8 @@ message ClientReplyAfterRestore {
 
 message ClientBackupRequest {
 	required string path = 1;
-	required string archive = 2;
-	required string meta = 3;
+	required bytes archive = 2;
+	required bytes meta = 3;
 }
 
 message ServerBackupResult {
