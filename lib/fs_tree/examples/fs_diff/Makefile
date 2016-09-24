@@ -8,7 +8,7 @@ RELEASE_DIR=$(BIN_DIR)/release/
 DEBUG_DIR=$(BIN_DIR)/debug/
 SRC_DIR=src/
 
-LIB_INCLUDE_DIR=../collect_file_tree/include/
+LIB_INCLUDE_DIR=../../include/
 
 CFLAGS+=-Wall -Werror \
 	 -I$(LIB_INCLUDE_DIR)
@@ -20,11 +20,11 @@ INCLUDES=\
 
 ifneq ($(DEBUG),)
 	TARGET_DIR+=$(DEBUG_DIR)
-	LIB_DIR=../collect_file_tree/bin/debug/
+	LIB_DIR=../../bin/debug/
 	CFLAGS += $(DEBUG_FLAGS)
 else
 	TARGET_DIR+=$(RELEASE_DIR)
-	LIB_DIR=../collect_file_tree/bin/release/
+	LIB_DIR=../../bin/release/
 	CFLAGS += $(RELEASE_FLAGS)
 endif
 CFLAGS+=-L$(LIB_DIR)
@@ -43,7 +43,7 @@ $(TARGET_DIR)/fs_diff: $(SRC_DIR)/fs_diff.c \
 #	cp $(SRC_DIR)/run_test.sh $(TARGET_DIR)
 
 $(LIBS):
-	make -C ../collect_file_tree DEBUG=$(DEBUG)
+	make -C ../.. DEBUG=$(DEBUG)
 
 $(TARGET_DIR):
 	mkdir -p $(TARGET_DIR)

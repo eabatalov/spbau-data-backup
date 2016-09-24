@@ -1,7 +1,7 @@
 system($$PWD/gen.sh)
 
-!include( $$PWD/../collect_file_tree/collect_file_tree.pri ){
-    error( "Couldn't find the collect_file_tree.pri file!" )
+!include( $$PWD/../fs_tree/fs_tree.pri ){
+    error( "Couldn't find the fs_tree.pri file!" )
 }
 
 LIBS += -L/usr/local/lib -lprotobuf

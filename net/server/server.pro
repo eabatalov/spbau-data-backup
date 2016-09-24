@@ -6,7 +6,11 @@ CONFIG += c++11
 #QMAKE_CXXFLAGS += -std=c++11
 #QMAKE_LFLAGS +=  -std=c++11
 
-#system($$PWD/../common/gen.sh)
+!include( $$PWD/../../lib/network_library/network_library.pri ){
+    error( "Couldn't find the network_library.pri file!" )
+}
+
+#system($$PWD/../protocol/gen.sh)
 
 TARGET = server
 CONFIG += console
@@ -18,26 +22,23 @@ LIBS += -L/usr/local/lib -lprotobuf
 
 TEMPLATE = app
 
-INCLUDEPATH += $$PWD/../echoclient/src \
-               $$PWD/../common/ \
-               $$PWD/../common/gen \
-               $$PWD/../echoserver/src \
+INCLUDEPATH += \
+               $$PWD/../protocol/ \
+               $$PWD/../protocol/gen \
                $$PWD/gen
 
 SOURCES += $$PWD/src/main.cpp \
            $$PWD/src/serverclientmanager.cpp \
-           $$PWD/../echoclient/src/networkstream.cpp \
            $$PWD/src/clientsessiononserver.cpp \
-           $$PWD/../common/gen/networkMsgStructs.pb.cc \
+           $$PWD/../protocol/gen/networkMsgStructs.pb.cc \
            $$PWD/gen/serverStructs.pb.cc
 
 
 HEADERS += \
     $$PWD/src/serverclientmanager.h \
     $$PWD/src/clientsessiononserver.h \
-    $$PWD/../echoclient/src/networkstream.h \
-    $$PWD/../common/protocol.h \
-    $$PWD/../common/gen/networkMsgStructs.pb.h \
+    $$PWD/../protocol/protocol.h \
+    $$PWD/../protocol/gen/networkMsgStructs.pb.h \
     $$PWD/gen/serverStructs.pb.h
     
 DESTDIR = $$PWD/bin
