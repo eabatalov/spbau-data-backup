@@ -6,7 +6,7 @@
 #include <QDataStream>
 #include <QByteArray>
 #include <string>
-#include "../../common/protocol.h"
+#include "../../protocol/protocol.h"
 
 class NetworkStream : public QObject
 {

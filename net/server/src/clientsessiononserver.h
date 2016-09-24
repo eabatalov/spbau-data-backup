@@ -1,7 +1,6 @@
 #ifndef PERCLIENT_H
 #define PERCLIENT_H
 
-#include "../../echoclient/src/networkstream.h"
 #include <networkstream.h>
 #include <QTcpSocket>
 #include <string>
