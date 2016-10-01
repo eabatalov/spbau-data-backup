@@ -10,8 +10,8 @@ CONFIG += c++11
     error( "Couldn't find the archiver.pri file!" )
 }
 
-!include( $$PWD/../../lib/network_library/network_library.pri ){
-    error( "Couldn't find the network_library.pri file!" )
+!include( $$PWD/../../lib/networking/networking.pri ){
+    error( "Couldn't find the networking.pri file!" )
 }
 
 #system($$PWD/../protocol/gen.sh)
