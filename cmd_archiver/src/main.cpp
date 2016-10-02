@@ -6,55 +6,67 @@
 #include <QFile>
 #include <QDir>
 #include <QByteArray>
+#include <QCommandLineParser>
 
 #include "struct_serialization.pb.h"
 #include "archiver_utils.h"
 #include <fs_tree.h>
 
-void checkArchiver(std::string dir1, std::string dir2);
-
 int main(int argc, char *argv[])
 {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
 
-    if (argc != 4 && argc != 3)
+    QCoreApplication app(argc, argv);
+    QCoreApplication::setApplicationName("cmd_archiver");
+    QCoreApplication::setApplicationVersion("1.0");
+
+    QCommandLineParser parser;
+    parser.setApplicationDescription("Command line archiver provide function to pack, unpack and list archive content\n"
+                                     "Examples of usage:\n"
+                                     "\"pack -i sourcePath -o outputFileArchive\" to pack sourcePath to outputFileArchive\n"
+                                     "\"unpack -i inputFileArchive -o outputPath\" to unpack inputFileArchive to outputPath\n"
+                                     "\"list -i ArchiveFile\" to check list fs_tree of archive data.");
+    parser.addHelpOption();
+    parser.addVersionOption();
+    parser.addPositionalArgument("action", "The action to be performed");
+
+    QCommandLineOption inputOption(QStringList() << "i" << "input", "Input directory or archive (depends from action).",
+                                   "input");
+    parser.addOption(inputOption);
+
+    QCommandLineOption outputOption(QStringList() << "o" << "output" , "Output directory or archive (depends from action).",
+                                    "output");
+    parser.addOption(outputOption);
+
+    parser.process(app);
+
+    if (parser.positionalArguments().at(0) == QString("pack"))
     {
-        std::cerr << "Incorrect number of arguments in cmd!\nPlease print one of:\n\"-p sourcePath outputFileArchive\" to pack sourcePath to outputFileArchive" << std::endl <<
-                     "\"-u inputFileArchive outputPath\" to unpack inputFileArchive to outputPath" << std::endl <<
-                     "\"-l ArchiveFile\" to check list fs_tree of archive data." << std::endl;
-        return -1;
-    }
-
-    if (argc == 4 && !strcmp("-p", argv[1]))
+        if (parser.isSet(inputOption) && parser.isSet(outputOption))
+            Archiver::pack(parser.value(inputOption).toStdString().c_str(), parser.value(outputOption).toStdString().c_str());
+        else
+            std::cerr << "Too few options with pack action." << std::endl;
+    } else
+    if (parser.positionalArguments().at(0) == QString("unpack"))
     {
-        Archiver::pack(argv[2], argv[3]);
-    }
-    else if (argc == 4 && !strcmp("-u", argv[1]))
+        if (parser.isSet(inputOption) && parser.isSet(outputOption))
+            Archiver::unpack(parser.value(inputOption).toStdString().c_str(), parser.value(outputOption).toStdString().c_str());
+        else
+            std::cerr << "Too few options with unpack action." << std::endl;
+    } else
+    if (parser.positionalArguments().at(0) == QString("list"))
     {
-        Archiver::unpack(argv[2], argv[3]);
-    }
-    else if (argc == 3 && !strcmp("-l", argv[1]))
+        if (parser.isSet(inputOption) && !parser.isSet(outputOption))
+        {
+            QTextStream QTextStream(stdout);
+            Archiver::printArchiveFsTree(parser.value(inputOption).toStdString().c_str(), QTextStream);
+        }
+        else
+            std::cerr << "Wrong options with list action." << std::endl;
+    } else
     {
-        QTextStream QTextStream(stdout);
-        Archiver::printArchiveFsTree(argv[2], QTextStream);
+        std::cerr << "Unexpected action." << std::endl;
     }
-    else
-    {
-        std::cerr << "Unknown first argument in cmd!\nPlease print one of:\n\"-p sourcePath outputFileArchive\" to pack sourcePath to outputFileArchive" << std::endl <<
-                     "\"-u inputFileArchive outputPath\" to unpack inputFileArchive to outputPath" << std::endl <<
-                     "\"-c sourcePath outputPath\" to check archiver's work for sourcePath and outputPath " << std::endl;
-        return -1;
-    }
-
-
-//  Example:
-
-//    archiver.pack("/home/kodark/Документы/CSC", "/home/kodark/Видео/test.pck");
-//    archiver.unpack("/home/kodark/Видео/test.pck", "/home/kodark/Видео/2");
-
-//    std::cout << "Done." << std::endl;
-
-//    checkArchiver("/home/kodark/Документы/CSC", "/home/kodark/Видео/2/CSC");
 
     google::protobuf::ShutdownProtobufLibrary();
 
