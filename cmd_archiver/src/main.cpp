@@ -32,6 +32,8 @@ int main(int argc, char *argv[])
 
     QCommandLineOption inputOption(QStringList() << "i" << "input", "Input directory or archive (depends from action).",
                                    "input");
+    // TODO use c++11 syntax and don't use *Option local variables. Use common option name constants.
+    // parser.addOption({ "i", "input" }, "Input directory");
     parser.addOption(inputOption);
 
     QCommandLineOption outputOption(QStringList() << "o" << "output" , "Output directory or archive (depends from action).",
@@ -43,6 +45,7 @@ int main(int argc, char *argv[])
     if (parser.positionalArguments().at(0) == QString("pack"))
     {
         if (parser.isSet(inputOption) && parser.isSet(outputOption))
+            // TODO fix usage of pointer returned from temporary object 
             Archiver::pack(parser.value(inputOption).toStdString().c_str(), parser.value(outputOption).toStdString().c_str());
         else
             std::cerr << "Too few options with pack action." << std::endl;

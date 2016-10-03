@@ -18,7 +18,6 @@
     if (DEBUG_FLAG) fprintf(stderr, "line: %d.  " format, __LINE__ ,var); \
     }while(0)
 
-
 ClientSession::ClientSession(NetworkStream* networkStream, ConsoleStream* consoleStream, QObject *parent)
     :QObject(parent)
     ,mNetworkStream(networkStream)
@@ -54,10 +53,12 @@ void ClientSession::onConsoleInput(const std::string& message)
                                    "backup path -- make backup");
 
         }
+        // TODO make all this commands working well
         else if (message == "ls")
         {
             askLs();
         }
+        // TODO Don't create temporaty strings with substr()
         else if (message.substr(0, 2) == "ls")
         {
             askLs(message.substr(3));

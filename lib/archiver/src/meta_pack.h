@@ -73,8 +73,10 @@ inline void unpack_regfile_inode(const ArchiverUtils::protobufStructs::PBDirEntM
     inode->inode.user_data = reinterpret_cast<void*>(index);
 }
 
-inline void pack_dir_inode(const dir_inode *inode, ArchiverUtils::protobufStructs::PBDirEntMetaData *packed, ArchiverUtils::protobufStructs::PBArchiveMetaData *metaArchive,
-                           const std::uint64_t dirIndexInPBArchiveMetaData)
+// TODO use type aliases for ArchiverUtils::protobufStructs::PBDirEntMetaData and ArchiverUtils::protobufStructs::PBArchiveMetaData
+inline void pack_dir_inode(const dir_inode *inode, ArchiverUtils::protobufStructs::PBDirEntMetaData *packed,
+        ArchiverUtils::protobufStructs::PBArchiveMetaData *metaArchive,
+        const std::uint64_t dirIndexInPBArchiveMetaData)
 {
     details::pack_inode(&inode->inode, packed);
     for (size_t i = 0; i < inode->num_children; ++i)

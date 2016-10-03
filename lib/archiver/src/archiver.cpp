@@ -197,6 +197,7 @@ void unpackRegfileFromArchive(AUS* aus, const ArchiverUtils::protobufStructs::PB
     close(fileDescriptor);
 }
 
+// TODO use type alias for ArchiverUtils::protobufStructs::PBDirEntMetaData
 void unpackDirFromArchive(struct inode * inode, AUS* aus, const ArchiverUtils::protobufStructs::PBDirEntMetaData & curDirent, std::string & path)
 {
     int fileDescriptor;
@@ -232,6 +233,7 @@ int unpackInodeFromArchive(struct inode* inode, void* pointerToAus)
     return 1;
 }
 
+// TODO const vector&
 void restoreDirsTime(std::vector<DirTimeSetTask> dirsQueue)
 {
     for (int i = dirsQueue.size()-1; i >= 0; --i)
