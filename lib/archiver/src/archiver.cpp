@@ -135,7 +135,7 @@ void writeDirentIndexInPBArchiveMetaData(std::uint64_t & direntIndexInPBArchiveM
     }
 }
 
-void updateDirentIndexInPBArchiveMetaData(std::uint64_t & direntIndexInPBArchiveMetaData, APS* aps, ArchiverUtils::protobufStructs::PBDirEntMetaData& tempMeta)
+void updateDirentInPBArchiveMetaData(std::uint64_t & direntIndexInPBArchiveMetaData, APS* aps, ArchiverUtils::protobufStructs::PBDirEntMetaData& tempMeta)
 {
     if (aps->metaArchive.pbdirentmetadata().Get(direntIndexInPBArchiveMetaData).has_parentix())
     {
@@ -169,7 +169,7 @@ int addInodeToArchive(struct inode* inode, void* pointerToAps)
         break;
     }
 
-    updateDirentIndexInPBArchiveMetaData(direntIndexInPBArchiveMetaData, aps, tempMeta);
+    updateDirentInPBArchiveMetaData(direntIndexInPBArchiveMetaData, aps, tempMeta);
 
     return 1;
 }

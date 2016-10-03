@@ -27,8 +27,8 @@ ServerClientManager::ServerClientManager(size_t maxClientNumber, QHostAddress ad
 
 ServerClientManager::~ServerClientManager()
 {
-    delete mClients;
-    delete used;
+    delete[] mClients;
+    delete[] used;
     mTcpServer->deleteLater();
     //delete mTcpServer;
     mClients = NULL;
