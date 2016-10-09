@@ -13,7 +13,7 @@
 #include <QByteArray>
 
 
-#define DEBUG_FLAG false
+#define DEBUG_FLAG true
 #define LOG(format, var) do{ \
     if (DEBUG_FLAG) fprintf(stderr, "line: %d.  " format, __LINE__ ,var); \
     }while(0)
@@ -266,9 +266,16 @@ void ClientSession::OnDetailedLs(const char *buffer, uint64_t bufferSize)
     {
         networkUtils::protobufStructs::LsDetailedServerAnswer lsDetailed;
         lsDetailed.ParseFromArray(buffer, bufferSize);
-        //TODO: add fstree
 
-        emit sigWriteToConsole(shortBackupInfoToString(lsDetailed.shortbackupinfo()) + "HERE will be fs_tree.");
+        QFile meta("curpack.pckmeta");
+        meta.open(QIODevice::WriteOnly);
+        meta.write(lsDetailed.meta().c_str(), lsDetailed.meta().size());
+        LOG("\n%ld\n", lsDetailed.meta().size());
+        QString fsTree;
+        QTextStream QTextStream(&fsTree);
+        Archiver::printArchiveFsTree("curpack.pck", QTextStream);
+
+        emit sigWriteToConsole(shortBackupInfoToString(lsDetailed.shortbackupinfo()) + "\n" + fsTree.toStdString());
         mClientState = WAIT_USER_INPUT;
     }
     else

@@ -10,7 +10,7 @@
 #include <QFile>
 #include <QByteArray>
 
-#define DEBUG_FLAG false
+#define DEBUG_FLAG true
 #define LOG(format, var) do{ \
     if (DEBUG_FLAG) fprintf(stderr, "line: %d.  " format, __LINE__ ,var); \
     }while(0)
@@ -99,7 +99,13 @@ void ClientSessionOnServer::onLsRequest(const char *buffer, uint64_t bufferSize)
         if (isValidBackupId(lsRequest.backupid()))
         {
             networkUtils::protobufStructs::LsDetailedServerAnswer lsDetailed;
-            lsDetailed.set_meta("some meta"); //TODO: fix it
+
+            std::string path = "backups/" + mLogin + "_" + inttostr((std::uint64_t)(lsRequest.backupid()));
+            QFile archiveMeta((path + std::string("meta")).c_str());
+            archiveMeta.open(QIODevice::ReadOnly);
+            QByteArray metaInQByteArray = archiveMeta.readAll();
+            lsDetailed.set_meta(metaInQByteArray.data(), metaInQByteArray.size());
+            LOG("\n%ld\n", metaInQByteArray.size());
             networkUtils::protobufStructs::ShortBackupInfo* backupInfo = new networkUtils::protobufStructs::ShortBackupInfo;
             backupInfo->set_backupid(mMetadatas.metadatas(lsRequest.backupid()).id());
             backupInfo->set_path(mMetadatas.metadatas(lsRequest.backupid()).origianlpath());

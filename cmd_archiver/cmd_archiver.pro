@@ -13,9 +13,13 @@ CONFIG += c++11
 
 TEMPLATE = app
 
-SOURCES += $$PWD/src/main.cpp
+SOURCES += $$PWD/src/main.cpp \
+    src/commandlinemanager.cpp
 
 
 DESTDIR = $$PWD/bin
 OBJECTS_DIR = $$PWD/objectfiles
 MOC_DIR = $$PWD/mocfiles
+
+HEADERS += \
+    src/commandlinemanager.h

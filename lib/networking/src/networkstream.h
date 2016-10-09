@@ -15,20 +15,20 @@ public:
     explicit NetworkStream(const QHostAddress & address, quint16 port, QObject *parent = 0);
     NetworkStream(QTcpSocket* tcpSocket, QObject *parent);
 
+public slots:
+    void receiveMessage();
+    void sendNetMessage(const QByteArray & message);
+
+signals:
+    void newNetMessage(const QByteArray & message);
+    void connected();
+
 private:
     QTcpSocket* mTcpSocket;
     quint64 mNextBlockSize;
 
 protected:
     void sendMessage(const QByteArray & message);
-
-signals:
-    void newNetMessage(const QByteArray & message);
-    void connected();
-
-public slots:
-    void receiveMessage();
-    void sendNetMessage(const QByteArray & message);
 
 private slots:
     void displayError(QAbstractSocket::SocketError socketError);

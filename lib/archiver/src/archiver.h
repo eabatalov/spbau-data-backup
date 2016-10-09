@@ -6,9 +6,9 @@
 class Archiver
 {
 public:
-    static void pack(const char* srcPath, const char* dstArchivePath);
-    static void unpack(const char* srcArchivePath, const char* dstPath);
-    static void printArchiveFsTree(const char* srcArchivePath, QTextStream & qTextStream);
+    static void pack(const std::string srcPath, const std::string dstArchivePath);
+    static void unpack(const std::string srcArchivePath, const std::string dstPath);
+    static void printArchiveFsTree(const std::string srcArchivePath, QTextStream & qTextStream);
 
 private:
     Archiver();

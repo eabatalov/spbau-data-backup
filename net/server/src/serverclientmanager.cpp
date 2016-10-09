@@ -30,7 +30,6 @@ ServerClientManager::~ServerClientManager()
     delete[] mClients;
     delete[] used;
     mTcpServer->deleteLater();
-    //delete mTcpServer;
     mClients = NULL;
     used = NULL;
 }

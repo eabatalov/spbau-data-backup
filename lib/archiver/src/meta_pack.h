@@ -9,6 +9,8 @@
 #include <struct_serialization.pb.h>
 #include "archiver_utils.h"
 
+namespace pbStructs = ArchiverUtils::protobufStructs;
+
 namespace details{
     inline void init_stat(struct stat& stat, uid_t uid,
             gid_t gid, time_t atime, time_t mtime, mode_t mode) {
@@ -20,7 +22,7 @@ namespace details{
     }
 
     inline void pack_inode(const inode *inode,
-            ArchiverUtils::protobufStructs::PBDirEntMetaData *packed)
+            pbStructs::PBDirEntMetaData *packed)
     {
         packed->set_uid(inode->attrs.st_uid);
         packed->set_gid(inode->attrs.st_gid);
@@ -47,7 +49,7 @@ namespace details{
 }
 
 inline void pack_regfile_inode(const regular_file_inode *inode,
-        ArchiverUtils::protobufStructs::PBDirEntMetaData *packed,
+        pbStructs::PBDirEntMetaData *packed,
         const std::string pathToFile, char* filesContent, std::uint64_t & contentFreePosition)
 {
     QFile file;
@@ -61,7 +63,7 @@ inline void pack_regfile_inode(const regular_file_inode *inode,
     contentFreePosition += inode->inode.attrs.st_size;
 }
 
-inline void unpack_regfile_inode(const ArchiverUtils::protobufStructs::PBDirEntMetaData *packed,
+inline void unpack_regfile_inode(const pbStructs::PBDirEntMetaData *packed,
                                  regular_file_inode *inode, std::vector<struct inode*> & indexToInodePointer,
                                  std::uint64_t index)
 {
@@ -73,9 +75,8 @@ inline void unpack_regfile_inode(const ArchiverUtils::protobufStructs::PBDirEntM
     inode->inode.user_data = reinterpret_cast<void*>(index);
 }
 
-// TODO use type aliases for ArchiverUtils::protobufStructs::PBDirEntMetaData and ArchiverUtils::protobufStructs::PBArchiveMetaData
-inline void pack_dir_inode(const dir_inode *inode, ArchiverUtils::protobufStructs::PBDirEntMetaData *packed,
-        ArchiverUtils::protobufStructs::PBArchiveMetaData *metaArchive,
+inline void pack_dir_inode(const dir_inode *inode, pbStructs::PBDirEntMetaData *packed,
+        pbStructs::PBArchiveMetaData *metaArchive,
         const std::uint64_t dirIndexInPBArchiveMetaData)
 {
     details::pack_inode(&inode->inode, packed);
@@ -88,7 +89,7 @@ inline void pack_dir_inode(const dir_inode *inode, ArchiverUtils::protobufStruct
     }
 }
 
-inline void unpack_dir_inode(const ArchiverUtils::protobufStructs::PBDirEntMetaData *packed,
+inline void unpack_dir_inode(const pbStructs::PBDirEntMetaData *packed,
      dir_inode * inode, std::vector<struct inode*> & indexToInodePointer, std::uint64_t numberDirChildren,
                              std::uint64_t index)
 {

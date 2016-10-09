@@ -15,6 +15,8 @@ public:
     explicit ServerClientManager(size_t maxClientNumber, QHostAddress adress, quint16 port,QObject *parent = 0);
     ~ServerClientManager();
 
+public slots:
+
 private:
     QTcpServer* mTcpServer;
     size_t mMaxClientNumber;
@@ -24,7 +26,7 @@ private:
 
 signals:
 
-public slots:
+
 
 private slots:
     void onNewConnection();

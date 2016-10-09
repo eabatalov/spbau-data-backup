@@ -11,14 +11,14 @@ class ConsoleStream : public QObject
 public:
     explicit ConsoleStream(QObject *parent = 0);
 
-private:
-    QSocketNotifier stdinNotifier;
-
 signals:
     void readln(const std::string& str);
 
 public slots:
     void println(const std::string& str);
+
+private:
+    QSocketNotifier stdinNotifier;
 
 private slots:
     void newInputString();

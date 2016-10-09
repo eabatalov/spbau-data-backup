@@ -13,6 +13,10 @@ class ClientSession : public QObject
 public:
     explicit ClientSession(NetworkStream* networkStream, ConsoleStream* consoleStream, QObject *parent = 0);
 
+signals:
+    void sigWriteToConsole(const std::string& message);
+    void sigWriteToNetwork(const QByteArray & message);
+
 private:
     NetworkStream* mNetworkStream;
     ConsoleStream* mConsoleStream;
@@ -44,9 +48,7 @@ private:
 
 
     std::string restorePath;
-signals:
-    void sigWriteToConsole(const std::string& message);
-    void sigWriteToNetwork(const QByteArray & message);
+
 
 private slots:
     void onConsoleInput(const std::string& message);
