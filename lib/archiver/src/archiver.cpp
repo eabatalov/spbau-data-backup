@@ -24,7 +24,7 @@
 #include <QFile>
 #include <QFileInfo>
 
-namespace pbStructs = ArchiverUtils::protobufStructs;
+namespace apb = ArchiverUtils::protobufStructs;
 
 
 #define DEBUG_FLAG false
@@ -40,9 +40,9 @@ struct ArchiveInfo{
 
 struct ArchivePackingState{
     char* filesContent;
-    std::uint64_t contentFreePosition; // TODO => filesContentWritePos and try to remove filesContent ptr
+    std::uint64_t contentFreePosition;
     std::string dirAbsPath;
-    pbStructs::PBArchiveMetaData metaArchive;
+    apb::PBArchiveMetaData metaArchive;
     ArchivePackingState(char* filesContent, std::string dirAbsPath)
         :filesContent(filesContent)
         ,contentFreePosition(0)
@@ -65,9 +65,9 @@ struct DirTimeSetTask
 struct ArchiveUnpackingState{
     char* filesContent;
     std::string dirAbsPath;
-    pbStructs::PBArchiveMetaData* metaArchive;
+    apb::PBArchiveMetaData* metaArchive;
     std::vector<DirTimeSetTask> dirsQueue;
-    ArchiveUnpackingState(char* filesContent, std::string dirAbsPath, pbStructs::PBArchiveMetaData* metaArchive)
+    ArchiveUnpackingState(char* filesContent, std::string dirAbsPath, apb::PBArchiveMetaData* metaArchive)
         :filesContent(filesContent)
         ,dirAbsPath(dirAbsPath)
         ,metaArchive(metaArchive)
@@ -91,7 +91,7 @@ int addInodeToArchive(struct inode* inode, void* pointerToAps);
 int unpackInodeFromArchive(struct inode* inode, void* pointerToAus);
 std::string getPathInArchive(struct inode* inode);
 void recursiveUnpack(const std::string& dstUnpackPath, std::uint64_t curIndex,
-                     const pbStructs::PBArchiveMetaData &metaArchive,
+                     const apb::PBArchiveMetaData &metaArchive,
                      const QByteArray& archives, const std::vector<std::vector<uint64_t> > &fsTree);
 
 
@@ -136,7 +136,7 @@ void writeDirentIndexInPBArchiveMetaData(std::uint64_t & direntIndexInPBArchiveM
     }
 }
 
-void updateDirentInPBArchiveMetaData(std::uint64_t & direntIndexInPBArchiveMetaData, APS* aps, pbStructs::PBDirEntMetaData& tempMeta)
+void updateDirentInPBArchiveMetaData(std::uint64_t & direntIndexInPBArchiveMetaData, APS* aps, apb::PBDirEntMetaData& tempMeta)
 {
     if (aps->metaArchive.pbdirentmetadata().Get(direntIndexInPBArchiveMetaData).has_parentix())
     {
@@ -153,7 +153,7 @@ int addInodeToArchive(struct inode* inode, void* pointerToAps)
 {
     APS* aps = static_cast<APS*>(pointerToAps);
 
-    pbStructs::PBDirEntMetaData tempMeta;
+    apb::PBDirEntMetaData tempMeta;
 
     std::uint64_t direntIndexInPBArchiveMetaData = 0;
     writeDirentIndexInPBArchiveMetaData(direntIndexInPBArchiveMetaData, inode, aps);
@@ -175,7 +175,7 @@ int addInodeToArchive(struct inode* inode, void* pointerToAps)
     return 1;
 }
 
-void unpackRegfileFromArchive(AUS* aus, const pbStructs::PBDirEntMetaData & curDirent, std::string & path)
+void unpackRegfileFromArchive(AUS* aus, const apb::PBDirEntMetaData & curDirent, std::string & path)
 {
     int fileDescriptor;
     timeval time[2];
@@ -198,7 +198,7 @@ void unpackRegfileFromArchive(AUS* aus, const pbStructs::PBDirEntMetaData & curD
     close(fileDescriptor);
 }
 
-void unpackDirFromArchive(struct inode * inode, AUS* aus, const pbStructs::PBDirEntMetaData & curDirent, std::string & path)
+void unpackDirFromArchive(struct inode * inode, AUS* aus, const apb::PBDirEntMetaData & curDirent, std::string & path)
 {
     int fileDescriptor;
     mkdir(path.c_str(), inode->attrs.st_mode);
@@ -215,7 +215,7 @@ void unpackDirFromArchive(struct inode * inode, AUS* aus, const pbStructs::PBDir
 int unpackInodeFromArchive(struct inode* inode, void* pointerToAus)
 {
     AUS* aus = static_cast<AUS*>(pointerToAus);
-    const pbStructs::PBDirEntMetaData& curDirent = aus->metaArchive->pbdirentmetadata((std::uint64_t)inode->user_data);
+    const apb::PBDirEntMetaData& curDirent = aus->metaArchive->pbdirentmetadata((std::uint64_t)inode->user_data);
     std::string path = aus->dirAbsPath + getPathInArchive(inode);
 
     switch (inode->type)
@@ -284,7 +284,7 @@ void Archiver::pack(const std::string srcPath, const std::string dstArchiverPath
 }
 
 
-void calcNumberDirChildren(pbStructs::PBArchiveMetaData & metaArchive, std::vector<std::uint64_t> & numberDirChildren)
+void calcNumberDirChildren(apb::PBArchiveMetaData & metaArchive, std::vector<std::uint64_t> & numberDirChildren)
 {
     for (std::uint64_t i = 0; i < metaArchive.pbdirentmetadata_size(); ++i)
     {
@@ -294,14 +294,14 @@ void calcNumberDirChildren(pbStructs::PBArchiveMetaData & metaArchive, std::vect
     }
 }
 
-void buildFsTree(std::unique_ptr<fs_tree, fs_treeDeleter> & fsTree, pbStructs::PBArchiveMetaData & metaArchive, std::vector<std::uint64_t> & numberDirChildren)
+void buildFsTree(std::unique_ptr<fs_tree, fs_treeDeleter> & fsTree, apb::PBArchiveMetaData & metaArchive, std::vector<std::uint64_t> & numberDirChildren)
 {
     std::vector<std::uint64_t> curDirChildren(metaArchive.pbdirentmetadata_size());
     std::vector<inode*> indexToInodePointer(metaArchive.pbdirentmetadata_size());
 
     for (std::uint64_t i = 0; i < metaArchive.pbdirentmetadata_size(); ++i)
     {
-        const pbStructs::PBDirEntMetaData& curDirent = metaArchive.pbdirentmetadata(i);
+        const apb::PBDirEntMetaData& curDirent = metaArchive.pbdirentmetadata(i);
         inode* curInode;
 
         if (S_ISDIR(curDirent.mode()))
@@ -316,6 +316,8 @@ void buildFsTree(std::unique_ptr<fs_tree, fs_treeDeleter> & fsTree, pbStructs::P
                 unpack_regfile_inode(&curDirent, curRegFileInode, indexToInodePointer, i);
                 curInode = reinterpret_cast<inode*>(curRegFileInode);
             }
+
+        LOG("buildFsTree on %s\n", curInode->name);
 
         if (curDirent.parentix() != i)
         {
@@ -333,7 +335,7 @@ void buildFsTree(std::unique_ptr<fs_tree, fs_treeDeleter> & fsTree, pbStructs::P
 void Archiver::unpack(const std::string srcArchivePath, const std::string dstPath)
 {
     std::ifstream inputFileWithMeta(srcArchivePath + std::string("meta"), std::ios::binary);
-    pbStructs::PBArchiveMetaData metaArchive;
+    apb::PBArchiveMetaData metaArchive;
     metaArchive.ParseFromIstream(&inputFileWithMeta);
 
     std::vector<std::uint64_t> numberDirChildren(metaArchive.pbdirentmetadata_size());
@@ -354,10 +356,19 @@ void Archiver::unpack(const std::string srcArchivePath, const std::string dstPat
 
 void printInodeToQTextStream(struct inode* inode, QTextStream & qTextStream, std::uint64_t spaceCount)
 {
+    LOG("visit %s\n", inode->name);
     for (std::uint64_t i = 0; i < spaceCount; ++i)
         qTextStream << " ";
 
     qTextStream << inode->name << "\n";
+
+    if (qTextStream.string() != 0) {
+        LOG("qTextStream.string()->size() %d\n", qTextStream.string()->size());
+    }
+
+    if (qTextStream.status() == QTextStream::WriteFailed) {
+        std::cerr << "Error in writing " << inode->name << " in qTextStream" << std::endl;
+    }
 
     if (inode->type == INODE_DIR)
     {
@@ -371,9 +382,16 @@ void printInodeToQTextStream(struct inode* inode, QTextStream & qTextStream, std
 
 void Archiver::printArchiveFsTree(const std::string srcArchivePath, QTextStream & qTextStream)
 {
+    LOG("printArchiveFsTree on file: %s\n", srcArchivePath.c_str());
     std::ifstream inputFileWithMeta(srcArchivePath + std::string("meta"), std::ios::binary);
-    pbStructs::PBArchiveMetaData metaArchive;
-    metaArchive.ParseFromIstream(&inputFileWithMeta);
+
+    LOG("inputFileWithMeta.is_open(): %d\n", inputFileWithMeta.is_open());
+    apb::PBArchiveMetaData metaArchive;
+    if (!metaArchive.ParseFromIstream(&inputFileWithMeta))
+    {
+        std::cerr << "Error with parsing archive from srcArchivePath" << std::endl;
+        return;
+    }
 
     std::vector<std::uint64_t> numberDirChildren(metaArchive.pbdirentmetadata_size());
     calcNumberDirChildren(metaArchive, numberDirChildren);
@@ -382,5 +400,7 @@ void Archiver::printArchiveFsTree(const std::string srcArchivePath, QTextStream 
     buildFsTree(fsTree, metaArchive, numberDirChildren);
 
     printInodeToQTextStream(fsTree.get()->head, qTextStream, 0);
+
+    inputFileWithMeta.close();
 }
 

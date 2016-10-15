@@ -55,11 +55,13 @@ void ServerClientManager::onNewConnection()
     if (!canAdd)
     {
         std::cerr << "Too much clients..." << std::endl;
+        newClient->deleteLater();
         return;
     }
 
     used[clientNumber] = true;
     ClientSessionOnServer* perClient = new ClientSessionOnServer(clientNumber, newClient, this);
+    connect(perClient, &ClientSessionOnServer::releaseClientPlace, this, &ServerClientManager::releaseClientPlace);
     mClients[clientNumber] = perClient;
 }
 

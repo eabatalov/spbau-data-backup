@@ -270,12 +270,20 @@ void ClientSession::OnDetailedLs(const char *buffer, uint64_t bufferSize)
         QFile meta("curpack.pckmeta");
         meta.open(QIODevice::WriteOnly);
         meta.write(lsDetailed.meta().c_str(), lsDetailed.meta().size());
-        LOG("\n%ld\n", lsDetailed.meta().size());
-        QString fsTree;
-        QTextStream QTextStream(&fsTree);
-        Archiver::printArchiveFsTree("curpack.pck", QTextStream);
+        meta.close();
+        LOG("lsDetailed.meta().size() = %ld\n", lsDetailed.meta().size());
 
-        emit sigWriteToConsole(shortBackupInfoToString(lsDetailed.shortbackupinfo()) + "\n" + fsTree.toStdString());
+        QString fsTree;
+
+        QTextStream qTextStream(&fsTree,  QIODevice::WriteOnly);
+        Archiver::printArchiveFsTree("./curpack.pck", qTextStream);
+        qTextStream.flush();
+
+        LOG("fsTree.size() = %d\n", fsTree.size());
+
+        std::string temp = shortBackupInfoToString(lsDetailed.shortbackupinfo()) + "\n" + fsTree.toStdString();
+        emit sigWriteToConsole(temp);
+
         mClientState = WAIT_USER_INPUT;
     }
     else
@@ -290,8 +298,6 @@ void ClientSession::OnSummaryLs(const char *buffer, uint64_t bufferSize)
     {
         networkUtils::protobufStructs::LsSummaryServerAnswer lsSummary;
         lsSummary.ParseFromArray(buffer, bufferSize);
-
-//        std::cerr << "Received " << lsSummary.ByteSize() << " bytes." << std::endl;
 
         std::string ans;
         for (int i = 0; i < lsSummary.shortbackupinfo_size(); ++i)

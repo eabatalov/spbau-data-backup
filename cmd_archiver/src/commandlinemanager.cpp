@@ -6,8 +6,8 @@
 #include <QCommandLineParser>
 #include <QCommandLineOption>
 
-const QString CommandLineManager::inputOption = QString("input_option");
-const QString CommandLineManager::outputOption = QString("output_option");
+const QString CommandLineManager::inputOption = QString("input");
+const QString CommandLineManager::outputOption = QString("output");
 
 CommandLineManager::CommandLineManager(QCoreApplication &app, QObject *parent) : QObject(parent)
 {
@@ -24,13 +24,12 @@ CommandLineManager::CommandLineManager(QCoreApplication &app, QObject *parent) :
     parser.addPositionalArgument("action", "The action to be performed");
 
     std::cerr << "Add inputOption: "
-              << parser.addOption(QCommandLineOption({"i", "input"}, "Input directory or archive (depends from action).", inputOption))
+              << parser.addOption(QCommandLineOption({"i", "input"}, "Input directory or archive (depends from action).", "PATH"))
               << std::endl;
     std::cerr << "Add outputOption: "
-              << parser.addOption(QCommandLineOption({"o", "output"}, "Output directory or archive (depends from action).", outputOption))
+              << parser.addOption(QCommandLineOption({"o", "output"}, "Output directory or archive (depends from action).", "PATH"))
               << std::endl;
     parser.process(app);
-    //std::cerr << parser.optionNames().toStdList() << std::endl;
 }
 
 void CommandLineManager::process() {
@@ -39,6 +38,8 @@ void CommandLineManager::process() {
     std::cerr << std::endl << "outputOption.toStdString()" << " : " << outputOption.toStdString() << std::endl;
 
     std::cerr << "parser.optionNames().size() = " << parser.optionNames().size() << std::endl;
+
+    std::cerr << "parser.optionNames().at(0).toStdString() = " << parser.optionNames().at(0).toStdString() << std::endl;
 
     if (parser.positionalArguments().at(0) == QString("pack"))
     {
@@ -58,8 +59,8 @@ void CommandLineManager::process() {
     {
         if (parser.isSet(inputOption) && !parser.isSet(outputOption))
         {
-            QTextStream QTextStream(stdout);
-            Archiver::printArchiveFsTree(parser.value(inputOption).toStdString().c_str(), QTextStream);
+            QTextStream qTextStream(stdout);
+            Archiver::printArchiveFsTree(parser.value(inputOption).toStdString().c_str(), qTextStream);
         }
         else
             std::cerr << "Wrong options with list action." << std::endl;

@@ -9,7 +9,7 @@
 #include <struct_serialization.pb.h>
 #include "archiver_utils.h"
 
-namespace pbStructs = ArchiverUtils::protobufStructs;
+namespace apb = ArchiverUtils::protobufStructs;
 
 namespace details{
     inline void init_stat(struct stat& stat, uid_t uid,
@@ -22,7 +22,7 @@ namespace details{
     }
 
     inline void pack_inode(const inode *inode,
-            pbStructs::PBDirEntMetaData *packed)
+            apb::PBDirEntMetaData *packed)
     {
         packed->set_uid(inode->attrs.st_uid);
         packed->set_gid(inode->attrs.st_gid);
@@ -49,7 +49,7 @@ namespace details{
 }
 
 inline void pack_regfile_inode(const regular_file_inode *inode,
-        pbStructs::PBDirEntMetaData *packed,
+        apb::PBDirEntMetaData *packed,
         const std::string pathToFile, char* filesContent, std::uint64_t & contentFreePosition)
 {
     QFile file;
@@ -63,7 +63,7 @@ inline void pack_regfile_inode(const regular_file_inode *inode,
     contentFreePosition += inode->inode.attrs.st_size;
 }
 
-inline void unpack_regfile_inode(const pbStructs::PBDirEntMetaData *packed,
+inline void unpack_regfile_inode(const apb::PBDirEntMetaData *packed,
                                  regular_file_inode *inode, std::vector<struct inode*> & indexToInodePointer,
                                  std::uint64_t index)
 {
@@ -75,8 +75,8 @@ inline void unpack_regfile_inode(const pbStructs::PBDirEntMetaData *packed,
     inode->inode.user_data = reinterpret_cast<void*>(index);
 }
 
-inline void pack_dir_inode(const dir_inode *inode, pbStructs::PBDirEntMetaData *packed,
-        pbStructs::PBArchiveMetaData *metaArchive,
+inline void pack_dir_inode(const dir_inode *inode, apb::PBDirEntMetaData *packed,
+        apb::PBArchiveMetaData *metaArchive,
         const std::uint64_t dirIndexInPBArchiveMetaData)
 {
     details::pack_inode(&inode->inode, packed);
@@ -89,7 +89,7 @@ inline void pack_dir_inode(const dir_inode *inode, pbStructs::PBDirEntMetaData *
     }
 }
 
-inline void unpack_dir_inode(const pbStructs::PBDirEntMetaData *packed,
+inline void unpack_dir_inode(const apb::PBDirEntMetaData *packed,
      dir_inode * inode, std::vector<struct inode*> & indexToInodePointer, std::uint64_t numberDirChildren,
                              std::uint64_t index)
 {

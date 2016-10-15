@@ -40,6 +40,7 @@ ClientSessionOnServer::ClientSessionOnServer(size_t clientNumber, QTcpSocket* cl
     connect(clientSocket, &QTcpSocket::disconnected, this, &ClientSessionOnServer::disconnectSocket);
 
 
+
     //TODO: Fix it
     mPerClientState = NORMAL;
     mLogin = "example";
@@ -105,7 +106,7 @@ void ClientSessionOnServer::onLsRequest(const char *buffer, uint64_t bufferSize)
             archiveMeta.open(QIODevice::ReadOnly);
             QByteArray metaInQByteArray = archiveMeta.readAll();
             lsDetailed.set_meta(metaInQByteArray.data(), metaInQByteArray.size());
-            LOG("\n%ld\n", metaInQByteArray.size());
+            LOG("\n%d\n", metaInQByteArray.size());
             networkUtils::protobufStructs::ShortBackupInfo* backupInfo = new networkUtils::protobufStructs::ShortBackupInfo;
             backupInfo->set_backupid(mMetadatas.metadatas(lsRequest.backupid()).id());
             backupInfo->set_path(mMetadatas.metadatas(lsRequest.backupid()).origianlpath());
@@ -296,8 +297,8 @@ void ClientSessionOnServer::disconnectSocket()
 
 bool ClientSessionOnServer::isValidBackupId(std::uint64_t backupId)
 {
-    LOG("backupId = %ld \t", backupId);
-    LOG("newBackupId = %ld\n", newBackupId);
+    LOG("Is backupId = %ld < ", backupId);
+    LOG("newBackupId = %ld?\n", newBackupId);
     if (backupId < newBackupId)
         return true;
     else
