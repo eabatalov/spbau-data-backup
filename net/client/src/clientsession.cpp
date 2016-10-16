@@ -103,6 +103,8 @@ void ClientSession::onNetworkInput(const QByteArray &message)
     case utils::serverExit:
         OnServerError(message.data()+utils::commandSize, message.size()-utils::commandSize);
         break;
+    case utils::notFoundBackupByIdOnServer:
+        OnNotFoundBackupId(message.data()+utils::commandSize, message.size()-utils::commandSize);
     default:
         std::cerr << "Unsupported command from server." << std::endl;
     }
@@ -200,15 +202,11 @@ void ClientSession::makeBackup(const std::string& command)
 {
     networkUtils::protobufStructs::ClientBackupRequest backupRequest;
     Archiver::pack(command.c_str(), "curpack.pck");
-    QFile meta("curpack.pckmeta");
-    QFile content("curpack.pckcontent");
-    meta.open(QIODevice::ReadOnly);
-    content.open(QIODevice::ReadOnly);
-    QByteArray contentBytes = content.readAll();
-    QByteArray metaBytes = meta.readAll();
-    backupRequest.set_archive(contentBytes.data(), contentBytes.size());
+    QFile archive("curpack.pck");
+    archive.open(QIODevice::ReadOnly);
+    QByteArray archiveByte = archive.readAll();
+    backupRequest.set_archive(archiveByte.data(), archiveByte.size());
     backupRequest.set_path(command);
-    backupRequest.set_meta(metaBytes.data(), metaBytes.size());
 
     std::string serializatedBackupRequest;
     if (!backupRequest.SerializeToString(&serializatedBackupRequest))
@@ -218,7 +216,6 @@ void ClientSession::makeBackup(const std::string& command)
     }
     sendSerializatedMessage(serializatedBackupRequest, utils::backup, backupRequest.ByteSize());
 
-    LOG("metasize = %ld\n", backupRequest.meta().size());
     LOG("archivesize = %ld\n", backupRequest.archive().size());
 
     mClientState = WAIT_BACKUP_RESULT;
@@ -267,7 +264,7 @@ void ClientSession::OnDetailedLs(const char *buffer, uint64_t bufferSize)
         networkUtils::protobufStructs::LsDetailedServerAnswer lsDetailed;
         lsDetailed.ParseFromArray(buffer, bufferSize);
 
-        QFile meta("curpack.pckmeta");
+        QFile meta("curpack.pck");
         meta.open(QIODevice::WriteOnly);
         meta.write(lsDetailed.meta().c_str(), lsDetailed.meta().size());
         meta.close();
@@ -276,7 +273,7 @@ void ClientSession::OnDetailedLs(const char *buffer, uint64_t bufferSize)
         QString fsTree;
 
         QTextStream qTextStream(&fsTree,  QIODevice::WriteOnly);
-        Archiver::printArchiveFsTree("./curpack.pck", qTextStream);
+        Archiver::printArchiveFsTree("curpack.pck", qTextStream);
         qTextStream.flush();
 
         LOG("fsTree.size() = %d\n", fsTree.size());
@@ -321,23 +318,16 @@ void ClientSession::OnReceiveArchiveToRestore(const char *buffer, uint64_t buffe
         networkUtils::protobufStructs::RestoreServerAnswer restoreAnswer;
         restoreAnswer.ParseFromArray(buffer, bufferSize);
         LOG("Receive restore. Size = %d\n", restoreAnswer.ByteSize());
-
-        LOG("metasize = %ld\n", restoreAnswer.meta().size());
         LOG("archivesize = %ld\n", restoreAnswer.archive().size());
 
-        QFile meta("curunpack.pckmeta");
-
-        QFile content("curunpack.pckcontent");
-        meta.open(QIODevice::WriteOnly);
-        content.open(QIODevice::WriteOnly);
-        content.write(restoreAnswer.archive().c_str(), restoreAnswer.archive().size());
-        meta.write(restoreAnswer.meta().c_str(), restoreAnswer.meta().size());
-        content.close();
-        meta.close();
+        QFile archive("curunpack.pck");
+        archive.open(QIODevice::WriteOnly);
+        archive.write(restoreAnswer.archive().c_str(), restoreAnswer.archive().size());
+        archive.close();
 
         LOG("restorePath: %s\n", restorePath.c_str());
         QFileInfo qfileinfo(restorePath.c_str());
-        LOG("Absolute restorePath: %s\n", qfileinfo.absolutePath().toStdString().c_str());
+        LOG("Absolute restorePath: %s\n", qfileinfo.canonicalFilePath().toStdString().c_str());
         if (qfileinfo.isDir())
         {
             Archiver::unpack("curunpack.pck", restorePath.c_str());
@@ -359,6 +349,16 @@ void ClientSession::OnReceiveArchiveToRestore(const char *buffer, uint64_t buffe
     }
 
 }
+
+void ClientSession::OnNotFoundBackupId(const char *buffer, uint64_t bufferSize) {
+    networkUtils::protobufStructs::ServerError serverError;
+    serverError.ParseFromArray(buffer, bufferSize);
+
+    emit sigWriteToConsole(serverError.errormessage());
+
+    mClientState = WAIT_LS_RESULT;
+}
+
 
 void ClientSession::OnReceiveBackupResults(const char *buffer, uint64_t bufferSize)
 {

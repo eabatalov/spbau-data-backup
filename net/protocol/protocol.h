@@ -23,7 +23,8 @@ namespace utils{
         ansToLsDetailed,
         ansToRestore,
         ansToBackup,
-        serverExit
+        serverExit,
+        notFoundBackupByIdOnServer
     };
 
     inline commandType toFixedType(ClientCommandId cmd){

@@ -1,5 +1,7 @@
 #include "clientsessiononserver.h"
+#include <archiver.h>
 #include <networkMsgStructs.pb.h>
+#include <struct_serialization.pb.h>
 
 #include <fstream>
 #include <iostream>
@@ -9,24 +11,12 @@
 
 #include <QFile>
 #include <QByteArray>
+#include <QDebug>
 
 #define DEBUG_FLAG true
 #define LOG(format, var) do{ \
     if (DEBUG_FLAG) fprintf(stderr, "line: %d.  " format, __LINE__ ,var); \
     }while(0)
-
-std::string inttostr(std::uint64_t number)
-{
-    if (number == 0)
-        return "0";
-    std::string S = "";
-    while (number > 0)
-    {
-        S = std::string(1, '0'+(char)(number % 10)) + S;
-        number /= 10;
-    }
-    return S;
-}
 
 ClientSessionOnServer::ClientSessionOnServer(size_t clientNumber, QTcpSocket* clientSocket, QObject *parent)
     :QObject(parent)
@@ -40,13 +30,12 @@ ClientSessionOnServer::ClientSessionOnServer(size_t clientNumber, QTcpSocket* cl
     connect(clientSocket, &QTcpSocket::disconnected, this, &ClientSessionOnServer::disconnectSocket);
 
 
-
-    //TODO: Fix it
+    //TODO: Fix it (add authorization)
     mPerClientState = NORMAL;
     mLogin = "example";
 
-
-    std::fstream metadatasFile("users/" + mLogin + std::string(".usermetas"), std::ios::in | std::ios::binary);
+    std::string mLoginStdString = mLogin.toStdString();
+    std::fstream metadatasFile("users/" + mLoginStdString + ".usermetas", std::ios::in | std::ios::binary);
 
     if (metadatasFile.is_open())
     {
@@ -56,7 +45,7 @@ ClientSessionOnServer::ClientSessionOnServer(size_t clientNumber, QTcpSocket* cl
         newBackupId = mMetadatas.metadatas_size();
     } else
     {
-        std::fstream newMetadatasFile("users/" + mLogin + std::string(".usermetas"), std::ios::out | std::ios::trunc | std::ios::binary);
+        std::fstream newMetadatasFile("users/" + mLoginStdString + std::string(".usermetas"), std::ios::out | std::ios::trunc | std::ios::binary);
         if (!mMetadatas.SerializeToOstream(&newMetadatasFile)) {
               std::cerr << "Failed to create metas info file." << std::endl;
         }
@@ -89,6 +78,19 @@ void ClientSessionOnServer::onNetworkInput(const QByteArray &message)
 
 }
 
+std::uint64_t getMetaDataSize(std::string path) {
+    std::ifstream inputFileWithMeta(path, std::ios::binary);
+
+    LOG("inputFileWithMeta.is_open(): %d\n", inputFileWithMeta.is_open());
+    ArchiverUtils::protobufStructs::PBArchiveMetaData archiveMetaData;
+    archiveMetaData.ParseFromIstream(&inputFileWithMeta);
+//    if (!archiveMetaData.ParseFromIstream(&inputFileWithMeta))
+//        qCritical() << "getMetaDataSize: Error with parse archive with metadata.";
+
+    //"-2" again.
+    return archiveMetaData.ByteSize()-2;
+}
+
 void ClientSessionOnServer::onLsRequest(const char *buffer, uint64_t bufferSize)
 {
     networkUtils::protobufStructs::LsClientRequest lsRequest;
@@ -101,11 +103,17 @@ void ClientSessionOnServer::onLsRequest(const char *buffer, uint64_t bufferSize)
         {
             networkUtils::protobufStructs::LsDetailedServerAnswer lsDetailed;
 
-            std::string path = "backups/" + mLogin + "_" + inttostr((std::uint64_t)(lsRequest.backupid()));
-            QFile archiveMeta((path + std::string("meta")).c_str());
+            QString path = "backups/" + mLogin + "_" + QString::number((std::uint64_t)(lsRequest.backupid()));
+            QFile archiveMeta(path);
+
             archiveMeta.open(QIODevice::ReadOnly);
             QByteArray metaInQByteArray = archiveMeta.readAll();
-            lsDetailed.set_meta(metaInQByteArray.data(), metaInQByteArray.size());
+
+            LOG("onLsRequest: sizeOfArchive = %ld\n", metaInQByteArray.size());
+
+            std::uint64_t sizeOfMetaData = getMetaDataSize(path.toStdString());
+
+            lsDetailed.set_meta(metaInQByteArray.data(), sizeOfMetaData);
             LOG("\n%d\n", metaInQByteArray.size());
             networkUtils::protobufStructs::ShortBackupInfo* backupInfo = new networkUtils::protobufStructs::ShortBackupInfo;
             backupInfo->set_backupid(mMetadatas.metadatas(lsRequest.backupid()).id());
@@ -123,7 +131,7 @@ void ClientSessionOnServer::onLsRequest(const char *buffer, uint64_t bufferSize)
         }
         else
         {
-            //TODO: fix it
+            sendNotFoundBackupIdToClient(lsRequest.backupid());
             std::cerr << "Unsupported backupid" << std::endl;
         }
     }else
@@ -166,19 +174,15 @@ void ClientSessionOnServer::onRestoreRequest(const char *bufferbuffer, uint64_t 
 
     if (isValidBackupId(restoreRequest.backupid()))
     {
-        std::string path = "backups/" + mLogin + "_" + inttostr((std::uint64_t)(restoreRequest.backupid()));
+        QString path = "backups/" + mLogin + "_" + QString::number((std::uint64_t)(restoreRequest.backupid()));
         mRestoreBackupId = restoreRequest.backupid();
 
-        QFile metaFile((path + "meta").c_str());
-        QFile contFile((path + "cont").c_str());
+        QFile metaFile(path);
         metaFile.open(QIODevice::ReadOnly);
-        contFile.open(QIODevice::ReadOnly);
-        QByteArray meta = metaFile.readAll();
-        QByteArray content = contFile.readAll();
+        QByteArray archive = metaFile.readAll();
 
         networkUtils::protobufStructs::RestoreServerAnswer restoreAnswer;
-        restoreAnswer.set_meta(meta.data(), meta.size());
-        restoreAnswer.set_archive(content.data(), content.size());
+        restoreAnswer.set_archive(archive.data(), archive.size());
         std::string serializated;
         if (!restoreAnswer.SerializeToString(&serializated))
         {
@@ -188,14 +192,26 @@ void ClientSessionOnServer::onRestoreRequest(const char *bufferbuffer, uint64_t 
         sendSerializatedMessage(serializated, utils::ansToRestore, restoreAnswer.ByteSize());
         mPerClientState = WAIT_RESTORE_RESULT;
         LOG("Send archive to restore. Size = %d\n", restoreAnswer.ByteSize());
-        LOG("metasize = %ld\n", restoreAnswer.meta().size());
         LOG("archivesize = %ld\n", restoreAnswer.archive().size());
     }
     else
     {
         LOG("Invalid backupid. backupid = %ld\n", restoreRequest.backupid());
-        //TODO fix it
+        sendNotFoundBackupIdToClient(restoreRequest.backupid());
     }
+}
+
+void ClientSessionOnServer::sendNotFoundBackupIdToClient(std::uint64_t backupId) {
+    networkUtils::protobufStructs::ServerError serverError;
+    serverError.set_errormessage((QString("Not found backupId on server: ") + QString::number(backupId)).toStdString());
+    std::string serializated;
+    if (!serverError.SerializeToString(&serializated))
+    {
+        std::cerr << "Error with serialization serverError." << std::endl;
+        return;
+    }
+    sendSerializatedMessage(serializated, utils::notFoundBackupByIdOnServer, serverError.ByteSize());
+    mPerClientState = NORMAL;
 }
 
 void ClientSessionOnServer::onReplyAfterRestore(const char *bufferbuffer, uint64_t bufferSize)
@@ -242,13 +258,12 @@ void ClientSessionOnServer::onBackupRequest(const char *bufferbuffer, uint64_t b
 
     bool isSuc = true;
 
-    std::string path = "backups/" + mLogin + "_" + inttostr((std::uint64_t)(newServerMetadata->id()));
-    std::fstream archiveMeta(path + std::string("meta"), std::ios::out | std::ios::trunc | std::ios::binary);
-    std::fstream archiveContent(path + std::string("cont"), std::ios::out | std::ios::trunc | std::ios::binary);
-    if (archiveMeta.is_open() && archiveContent.is_open())
+    std::string path = (QString("backups/") + mLogin + "_" + QString::number((std::uint64_t)(newServerMetadata->id()))).toStdString();
+
+    std::fstream archive(path, std::ios::out | std::ios::trunc | std::ios::binary);
+    if (archive.is_open())
     {
-        archiveContent.write(backupRequest.archive().c_str(), backupRequest.archive().size());
-        archiveMeta.write(backupRequest.meta().c_str(), backupRequest.meta().size());
+        archive.write(backupRequest.archive().c_str(), backupRequest.archive().size());
     }
     else
     {
@@ -262,7 +277,7 @@ void ClientSessionOnServer::onBackupRequest(const char *bufferbuffer, uint64_t b
     }
     else
     {
-        std::fstream metadatasFile("users/" + mLogin + std::string(".usermetas"), std::ios::in | std::ios::binary);
+        std::fstream metadatasFile("users/" + mLogin.toStdString() + std::string(".usermetas"), std::ios::in | std::ios::binary);
         if (!mMetadatas.ParseFromIstream(&metadatasFile)) {
               std::cerr << "Failed to read metas info." << std::endl;
         }
@@ -280,13 +295,12 @@ void ClientSessionOnServer::onBackupRequest(const char *bufferbuffer, uint64_t b
     }
     sendSerializatedMessage(serializated, utils::ansToBackup, backupResult.ByteSize());
 
-    LOG("metasize = %ld\n", backupRequest.meta().size());
     LOG("archivesize = %ld\n", backupRequest.archive().size());
 }
 
 void ClientSessionOnServer::onclientExit(const char *bufferbuffer, uint64_t bufferSize)
 {
-    //TODO
+    LOG("onclientExit = %ld\n", mClientNumber);
 }
 
 void ClientSessionOnServer::disconnectSocket()
@@ -308,7 +322,7 @@ bool ClientSessionOnServer::isValidBackupId(std::uint64_t backupId)
 bool ClientSessionOnServer::saveStateMetadatas()
 {
     bool isSuc = true;
-    std::fstream metadatasFile("users/" + mLogin + std::string(".usermetas"), std::ios::out | std::ios::trunc | std::ios::binary);
+    std::fstream metadatasFile("users/" + mLogin.toStdString() + std::string(".usermetas"), std::ios::out | std::ios::trunc | std::ios::binary);
     if (!mMetadatas.SerializeToOstream(&metadatasFile)) {
           std::cerr << "Failed to rewrite metas info file." << std::endl;
           isSuc = false;

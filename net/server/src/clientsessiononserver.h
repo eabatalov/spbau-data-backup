@@ -2,9 +2,13 @@
 #define PERCLIENT_H
 
 #include <networkstream.h>
-#include <QTcpSocket>
-#include <string>
 #include <serverStructs.pb.h>
+
+#include <QTcpSocket>
+#include <QString>
+
+
+
 
 class ClientSessionOnServer:public QObject
 {
@@ -14,7 +18,7 @@ public:
 
 private:
     size_t mClientNumber;
-    std::string mLogin;
+    QString mLogin;
     NetworkStream* mNetworkStream;
     serverUtils::protobufStructs::VectorOfServerMetadataForArchive mMetadatas;
     std::uint64_t newBackupId;
@@ -34,6 +38,7 @@ private:
     void onclientExit(const char* bufferbuffer, std::uint64_t bufferSize);
     void sendSerializatedMessage(const std::string& binaryMessage, utils::commandType cmdType, int messageSize);
     bool saveStateMetadatas();
+    void sendNotFoundBackupIdToClient(std::uint64_t backupId);
 
 signals:
     void releaseClientPlace(size_t clientNumber);

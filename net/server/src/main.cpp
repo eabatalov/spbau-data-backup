@@ -14,9 +14,5 @@ int main(int argc, char *argv[])
 
     ServerClientManager serverClientManager(4, QHostAddress::Any, PORT_NUMBER, &app);
 
-    
-    
-    //TODO:
-    //google::protobuf::ShutdownProtobufLibrary();
     return app.exec();
 }

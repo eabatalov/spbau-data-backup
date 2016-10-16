@@ -2,8 +2,8 @@
 #define ARCHIVER_UTILS_H
 
 namespace ArchiverUtils {
-    std::string getDirentName(std::string const & path);
-    std::string getDirAbsPath(std::string const & path);
+    QString getDirentName(const QString &path);
+    QString getDirAbsPath(const QString &path);
 }
 
 

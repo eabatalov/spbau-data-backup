@@ -2,13 +2,14 @@
 #define ARCHIVER_H
 
 #include <QTextStream>
+#include <QString>
 
 class Archiver
 {
 public:
-    static void pack(const std::string srcPath, const std::string dstArchivePath);
-    static void unpack(const std::string srcArchivePath, const std::string dstPath);
-    static void printArchiveFsTree(const std::string srcArchivePath, QTextStream & qTextStream);
+    static void pack(const QString & srcPath, const QString & dstArchivePath);
+    static void unpack(const QString & srcArchivePath, const QString & dstPath);
+    static void printArchiveFsTree(const QString & srcArchivePath, QTextStream & qTextStream);
 
 private:
     Archiver();

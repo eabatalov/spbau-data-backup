@@ -6,12 +6,13 @@
 #include <QFile>
 #include <QDir>
 #include <QByteArray>
+#include <QDebug>
 
 #include "struct_serialization.pb.h"
 #include "archiver_utils.h"
 #include <fs_tree.h>
 
-void checkArchiver(std::string dir1, std::string dir2);
+void checkArchiver(QString dir1, QString dir2);
 
 int main(int argc, char *argv[])
 {
@@ -60,10 +61,10 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-bool checkInode(inode* first, inode* second, const std::string & dir1, const std::string & dir2)
+bool checkInode(inode* first, inode* second, const QString & dir1, const QString & dir2)
 {
-    std::string name1 = first->name;
-    std::string name2 = second->name;
+    QString name1 = first->name;
+    QString name2 = second->name;
     if (first->parent == NULL)
     {
         name1 = ArchiverUtils::getDirentName(first->name);
@@ -71,20 +72,20 @@ bool checkInode(inode* first, inode* second, const std::string & dir1, const std
     }
     if (name1 != name2)
     {
-        std::cerr << dir1 + name1 << "!=" << dir2 + name2 << std::endl;
+        qCritical() << dir1 + name1 << "!=" << dir2 + name2 << '\n';
         return false;
     }
 
     if (first->type != second->type)
     {
-        std::cerr << dir1 + name1 << ": different types" << std::endl;
+        qCritical() << dir1 + name1 << ": different types" << '\n';
         return false;
     }
     if (first->attrs.st_atime != second->attrs.st_atime || first->attrs.st_mtime != second->attrs.st_mtime ||
             first->attrs.st_mode != second->attrs.st_mode || first->attrs.st_uid != second->attrs.st_uid ||
             first->attrs.st_gid != second->attrs.st_gid)
     {
-        std::cerr << dir1 + name1 << ": different attrs" << std::endl;
+        qCritical() << dir1 + name1 << ": different attrs" << '\n';
         return false;
     }
 
@@ -92,18 +93,18 @@ bool checkInode(inode* first, inode* second, const std::string & dir1, const std
     {
         if (first->attrs.st_size != second->attrs.st_size)
         {
-            std::cerr << dir1 + name1 << ": different size" << std::endl;
+            qCritical() << dir1 + name1 << ": different size" << '\n';
             return false;
         }
-        QFile file1((dir1 + name1).c_str());
+        QFile file1(dir1 + name1);
         file1.open(QIODevice::ReadOnly);
-        QFile file2((dir2 + name2).c_str());
+        QFile file2(dir2 + name2);
         file2.open(QIODevice::ReadOnly);
         QByteArray bytes1 = file1.readAll();
         QByteArray bytes2 = file2.readAll();
         if (strcmp(bytes1.data(), bytes2.data()))
         {
-            std::cerr << dir1 + name1 << ": different content" << std::endl;
+            qCritical() << dir1 + name1 << ": different content" << '\n';
             return false;
         }
     }
@@ -114,13 +115,13 @@ bool checkInode(inode* first, inode* second, const std::string & dir1, const std
         dir_inode* second_dir = reinterpret_cast<dir_inode*>(second);
         if (first_dir->num_children != second_dir->num_children)
         {
-            std::cerr << dir1 + name1 << ": different numchildren" << std::endl;
+            qCritical() << dir1 + name1 << ": different numchildren" << '\n';
             return false;
         }
 
         for (std::uint64_t i = 0; i < first_dir->num_children; ++i)
         {
-            if ( !checkInode(first_dir->children[i], second_dir->children[i], dir1 + name1 + "/", dir2 + name2 + "/") )
+            if ( !checkInode(first_dir->children[i], second_dir->children[i], dir1 + name1 + QDir::separator(), dir2 + name2 + QDir::separator()) )
             {
                 return false;
             }
@@ -131,10 +132,10 @@ bool checkInode(inode* first, inode* second, const std::string & dir1, const std
     return true;
 }
 
-void checkArchiver(std::string dir1, std::string dir2)
+void checkArchiver(QString dir1, QString dir2)
 {
-    fs_tree* tree1 = fs_tree_collect(dir1.c_str());
-    fs_tree* tree2 = fs_tree_collect(dir2.c_str());
+    fs_tree* tree1 = fs_tree_collect(dir1.toStdString().c_str());
+    fs_tree* tree2 = fs_tree_collect(dir2.toStdString().c_str());
 
     dir1 = ArchiverUtils::getDirAbsPath(dir1);
     dir2 = ArchiverUtils::getDirAbsPath(dir2);

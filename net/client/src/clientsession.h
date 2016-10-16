@@ -45,6 +45,7 @@ private:
     void OnReceiveArchiveToRestore(const char *buffer, uint64_t bufferSize);
     void OnReceiveBackupResults(const char *buffer, uint64_t bufferSize);
     void OnServerError(const char *buffer, uint64_t bufferSize);
+    void OnNotFoundBackupId(const char *buffer, uint64_t bufferSize);
 
 
     std::string restorePath;

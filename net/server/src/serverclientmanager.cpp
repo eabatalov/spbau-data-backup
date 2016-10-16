@@ -32,6 +32,7 @@ ServerClientManager::~ServerClientManager()
     mTcpServer->deleteLater();
     mClients = NULL;
     used = NULL;
+    google::protobuf::ShutdownProtobufLibrary();
 }
 
 bool ServerClientManager::clientExist(size_t clientNumber)

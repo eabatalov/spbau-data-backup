@@ -44,14 +44,14 @@ void CommandLineManager::process() {
     if (parser.positionalArguments().at(0) == QString("pack"))
     {
         if (parser.isSet(inputOption) && parser.isSet(outputOption))
-            Archiver::pack(parser.value(inputOption).toStdString(), parser.value(outputOption).toStdString());
+            Archiver::pack(parser.value(inputOption), parser.value(outputOption));
         else
             std::cerr << "Too few options with pack action." << std::endl;
     } else
     if (parser.positionalArguments().at(0) == QString("unpack"))
     {
         if (parser.isSet(inputOption) && parser.isSet(outputOption))
-            Archiver::unpack(parser.value(inputOption).toStdString().c_str(), parser.value(outputOption).toStdString().c_str());
+            Archiver::unpack(parser.value(inputOption), parser.value(outputOption));
         else
             std::cerr << "Too few options with unpack action." << std::endl;
     } else
@@ -60,7 +60,7 @@ void CommandLineManager::process() {
         if (parser.isSet(inputOption) && !parser.isSet(outputOption))
         {
             QTextStream qTextStream(stdout);
-            Archiver::printArchiveFsTree(parser.value(inputOption).toStdString().c_str(), qTextStream);
+            Archiver::printArchiveFsTree(parser.value(inputOption), qTextStream);
         }
         else
             std::cerr << "Wrong options with list action." << std::endl;

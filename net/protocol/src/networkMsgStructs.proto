@@ -29,8 +29,7 @@ message RestoreClientRequest {
 }
 
 message RestoreServerAnswer {
-	required bytes meta = 1;
-	required bytes archive = 2;
+	required bytes archive = 1;
 }
 
 message ClientReplyAfterRestore {
@@ -42,7 +41,6 @@ message ClientReplyAfterRestore {
 message ClientBackupRequest {
 	required string path = 1;
 	required bytes archive = 2;
-	required bytes meta = 3;
 }
 
 message ServerBackupResult {

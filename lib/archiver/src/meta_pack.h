@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <QFile>
+#include <QString>
 
 #include <fs_tree.h>
 #include <struct_serialization.pb.h>
@@ -34,7 +35,7 @@ namespace details{
         {
             if (inode->parent == NULL)
             {
-                packed->set_name(ArchiverUtils::getDirentName(inode->name));
+                packed->set_name(ArchiverUtils::getDirentName(inode->name).toStdString());
             }
             else
             {
@@ -50,14 +51,14 @@ namespace details{
 
 inline void pack_regfile_inode(const regular_file_inode *inode,
         apb::PBDirEntMetaData *packed,
-        const std::string pathToFile, char* filesContent, std::uint64_t & contentFreePosition)
+        const QString pathToFile, char* filesContent, std::uint64_t & contentFreePosition)
 {
     QFile file;
     details::pack_inode(&inode->inode, packed);
     packed->mutable_pbregfilemetadata()->set_contentsize(inode->inode.attrs.st_size);
     packed->mutable_pbregfilemetadata()->set_contentoffset(contentFreePosition);
 
-    file.setFileName(pathToFile.c_str());
+    file.setFileName(pathToFile);
     file.open(QIODevice::ReadOnly);
     memcpy(filesContent + contentFreePosition, file.readAll().data(), inode->inode.attrs.st_size);
     contentFreePosition += inode->inode.attrs.st_size;
