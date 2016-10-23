@@ -4,6 +4,7 @@
 namespace ArchiverUtils {
     QString getDirentName(const QString &path);
     QString getDirAbsPath(const QString &path);
+    const size_t byteSizeOfNumber = sizeof(std::uint64_t);
 }
 
 

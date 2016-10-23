@@ -25,7 +25,7 @@ signals:
 
 private:
     QTcpSocket* mTcpSocket;
-    quint64 mNextBlockSize;
+    qint64 mNextBlockSize;
 
 protected:
     void sendMessage(const QByteArray & message);

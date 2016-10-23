@@ -5,8 +5,7 @@
 #include <string>
 #include <QSocketNotifier>
 
-class ConsoleStream : public QObject
-{
+class ConsoleStream : public QObject {
     Q_OBJECT
 public:
     explicit ConsoleStream(QObject *parent = 0);

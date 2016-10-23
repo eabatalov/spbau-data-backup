@@ -83,7 +83,7 @@ inline void pack_dir_inode(const dir_inode *inode, apb::PBDirEntMetaData *packed
     details::pack_inode(&inode->inode, packed);
     for (size_t i = 0; i < inode->num_children; ++i)
     {
-        inode->children[i]->user_data = (void*)(metaArchive->pbdirentmetadata_size());
+        inode->children[i]->user_data = (void*)((std::uint64_t)metaArchive->pbdirentmetadata_size());
         std::uint64_t childindex = metaArchive->pbdirentmetadata_size();
         metaArchive->add_pbdirentmetadata();
         metaArchive->mutable_pbdirentmetadata()->Mutable(childindex)->set_parentix(dirIndexInPBArchiveMetaData);

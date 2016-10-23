@@ -7,11 +7,13 @@
 #include "networkstream.h"
 #include "consolestream.h"
 
-class ClientSession : public QObject
-{
+class ClientSession : public QObject {
     Q_OBJECT
 public:
     explicit ClientSession(NetworkStream* networkStream, ConsoleStream* consoleStream, QObject *parent = 0);
+    ~ClientSession() {
+        google::protobuf::ShutdownProtobufLibrary();
+    }
 
 signals:
     void sigWriteToConsole(const std::string& message);
@@ -20,7 +22,7 @@ signals:
 private:
     NetworkStream* mNetworkStream;
     ConsoleStream* mConsoleStream;
-    enum ClientState{
+    enum ClientState {
         NOT_STARTED,
         WAIT_USER_INPUT,
         WAIT_LS_RESULT,
@@ -46,6 +48,7 @@ private:
     void OnReceiveBackupResults(const char *buffer, uint64_t bufferSize);
     void OnServerError(const char *buffer, uint64_t bufferSize);
     void OnNotFoundBackupId(const char *buffer, uint64_t bufferSize);
+    void OnServerExit(const char *buffer, uint64_t bufferSize);
 
 
     std::string restorePath;

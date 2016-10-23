@@ -24,6 +24,7 @@ namespace utils{
         ansToRestore,
         ansToBackup,
         serverExit,
+        serverError,
         notFoundBackupByIdOnServer
     };
 

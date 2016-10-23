@@ -8,8 +8,7 @@
 #include <QHostAddress>
 #include "clientsessiononserver.h"
 
-class ServerClientManager : public QObject
-{
+class ServerClientManager : public QObject {
     Q_OBJECT
 public:
     explicit ServerClientManager(size_t maxClientNumber, QHostAddress adress, quint16 port,QObject *parent = 0);
@@ -25,8 +24,6 @@ private:
     bool clientExist(size_t clientNumber);
 
 signals:
-
-
 
 private slots:
     void onNewConnection();

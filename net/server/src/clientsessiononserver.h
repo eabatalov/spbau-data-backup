@@ -10,8 +10,7 @@
 
 
 
-class ClientSessionOnServer:public QObject
-{
+class ClientSessionOnServer:public QObject {
     Q_OBJECT
 public:
     ClientSessionOnServer(size_t clientNumber, QTcpSocket *clientSocket, QObject* parent = 0);
@@ -23,7 +22,7 @@ private:
     serverUtils::protobufStructs::VectorOfServerMetadataForArchive mMetadatas;
     std::uint64_t newBackupId;
     std::uint64_t mRestoreBackupId;
-    enum PerClientState{
+    enum PerClientState {
         NOT_AUTORIZATED,
         NORMAL,
         WAIT_RESTORE_RESULT,
@@ -35,10 +34,12 @@ private:
     void onRestoreRequest(const char* bufferbuffer, std::uint64_t bufferSize);
     void onReplyAfterRestore(const char* bufferbuffer, std::uint64_t bufferSize);
     void onBackupRequest(const char* bufferbuffer, std::uint64_t bufferSize);
-    void onclientExit(const char* bufferbuffer, std::uint64_t bufferSize);
+    void onclientExit();
     void sendSerializatedMessage(const std::string& binaryMessage, utils::commandType cmdType, int messageSize);
     bool saveStateMetadatas();
     void sendNotFoundBackupIdToClient(std::uint64_t backupId);
+    void sendServerError(QString message);
+    void sendServerExit(QString message);
 
 signals:
     void releaseClientPlace(size_t clientNumber);

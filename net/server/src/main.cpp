@@ -7,8 +7,7 @@
 
 #define HOST_ADDRESS "0.0.0.0"
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
     QCoreApplication app(argc, argv);
 

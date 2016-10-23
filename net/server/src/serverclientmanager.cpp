@@ -4,12 +4,10 @@
 
 ServerClientManager::ServerClientManager(size_t maxClientNumber, QHostAddress adress, quint16 port, QObject *parent)
     : QObject(parent)
-    , mMaxClientNumber(maxClientNumber)
-{
+    , mMaxClientNumber(maxClientNumber) {
     mClients = new ClientSessionOnServer*[mMaxClientNumber];
     used = new bool[mMaxClientNumber];
-    for (size_t i = 0; i < mMaxClientNumber; ++i)
-    {
+    for (size_t i = 0; i < mMaxClientNumber; ++i) {
         mClients[i] = NULL;
         used[i] = false;
     }
@@ -18,15 +16,13 @@ ServerClientManager::ServerClientManager(size_t maxClientNumber, QHostAddress ad
         std::cerr << tr("Unable to start the server: %1.").
                      arg(mTcpServer->errorString()).toStdString() << std::endl;
         return;
-    }
-    else
+    } else
         std::cout << "Start listening" << std::endl;
 
     connect(mTcpServer, &QTcpServer::newConnection, this, &ServerClientManager::onNewConnection);
 }
 
-ServerClientManager::~ServerClientManager()
-{
+ServerClientManager::~ServerClientManager() {
     delete[] mClients;
     delete[] used;
     mTcpServer->deleteLater();
@@ -35,26 +31,21 @@ ServerClientManager::~ServerClientManager()
     google::protobuf::ShutdownProtobufLibrary();
 }
 
-bool ServerClientManager::clientExist(size_t clientNumber)
-{
+bool ServerClientManager::clientExist(size_t clientNumber) {
     return (clientNumber < mMaxClientNumber && used[clientNumber]);
 }
 
-void ServerClientManager::onNewConnection()
-{
+void ServerClientManager::onNewConnection() {
     QTcpSocket* newClient = mTcpServer->nextPendingConnection();
     bool canAdd = false;
     size_t clientNumber = 0;
-    for (size_t i = 0; i < mMaxClientNumber && !canAdd; ++i)
-    {
-        if (!used[i])
-        {
+    for (size_t i = 0; i < mMaxClientNumber && !canAdd; ++i) {
+        if (!used[i]) {
             clientNumber = i;
             canAdd = true;
         }
     }
-    if (!canAdd)
-    {
+    if (!canAdd) {
         std::cerr << "Too much clients..." << std::endl;
         newClient->deleteLater();
         return;
@@ -66,8 +57,7 @@ void ServerClientManager::onNewConnection()
     mClients[clientNumber] = perClient;
 }
 
-void ServerClientManager::releaseClientPlace(size_t clientNumber)
-{
+void ServerClientManager::releaseClientPlace(size_t clientNumber) {
     mClients[clientNumber] = NULL;
     used[clientNumber] = false;
 }

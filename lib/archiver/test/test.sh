@@ -13,3 +13,11 @@ cd ./bin
 ./test_archiver -p ../tests/3 ../tests/archives/3.pck
 ./test_archiver -u ../tests/archives/3.pck ../tests/unpacked/
 ./test_archiver -c ../tests/3 ../tests/unpacked/3 
+
+./test_archiver -p ../tests/img ../tests/archives/img.pck
+./test_archiver -u ../tests/archives/img.pck ../tests/unpacked/
+./test_archiver -c ../tests/img ../tests/unpacked/img 
+
+./test_archiver -p ../tests/4 ../tests/archives/4.pck
+./test_archiver -u ../tests/archives/4.pck ../tests/unpacked/
+./test_archiver -c ../tests/4 ../tests/unpacked/4 

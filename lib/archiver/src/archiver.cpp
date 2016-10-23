@@ -1,5 +1,6 @@
 #include "archiver.h"
 #include "meta_pack.h"
+#include "archiver_structs.h"
 #include "archiver_utils.h"
 #include <fs_tree.h>
 #include <struct_serialization.pb.h>
@@ -27,130 +28,87 @@
 
 namespace apb = ArchiverUtils::protobufStructs;
 
-
-#define DEBUG_FLAG true
+#define DEBUG_FLAG false
 #define LOG(format, var) do{ \
     if (DEBUG_FLAG) fprintf(stderr, "line: %d.  " format, __LINE__ ,var); \
     }while(0)
 
-struct ArchiveInfo{
-    std::uint64_t contentSize;
-    ArchiveInfo()
-        :contentSize(0){}
-};
-
-struct ArchivePackingState{
-    char* filesContent;
-    std::uint64_t contentFreePosition;
-    QString dirAbsPath;
-    apb::PBArchiveMetaData metaArchive;
-    ArchivePackingState(char* filesContent, const QString & dirAbsPath)
-        :filesContent(filesContent)
-        ,contentFreePosition(0)
-        ,dirAbsPath(dirAbsPath)
-    {}
-};
-
-typedef ArchivePackingState APS;
-
-struct DirTimeSetTask
-{
-    int fd;
-    std::uint64_t atime;
-    std::uint64_t mtime;
-    DirTimeSetTask(int fd, std::uint64_t atime, std::uint64_t mtime)
-        :fd(fd), atime(atime), mtime(mtime)
-    {}
-};
-
-struct ArchiveUnpackingState{
-    char* filesContent;
-    QString dirAbsPath;
-    apb::PBArchiveMetaData* metaArchive;
-    std::vector<DirTimeSetTask> dirsQueue;
-    ArchiveUnpackingState(char* filesContent, const QString & dirAbsPath, apb::PBArchiveMetaData* metaArchive)
-        :filesContent(filesContent)
-        ,dirAbsPath(dirAbsPath)
-        ,metaArchive(metaArchive)
-    {}
-};
-
-typedef ArchiveUnpackingState AUS;
-
-
-class fs_treeDeleter
-{
+class fs_treeDeleter {
 public:
-    void operator()(fs_tree* p) const
-    {
+    void operator()(fs_tree* p) const {
         fs_tree_destroy(p);
     }
 };
 
-int computeArchiveSize(struct inode* inode, void* pointerToArchiveInfo);
+
+//all new functions
 int addInodeToArchive(struct inode* inode, void* pointerToAps);
-int unpackInodeFromArchive(struct inode* inode, void* pointerToAus);
+void buildFsTree(std::unique_ptr<fs_tree, fs_treeDeleter> & fsTree, apb::PBArchiveMetaData & metaArchive,
+                 std::vector<std::uint64_t> & numberDirChildren);
+void calcNumberDirChildren(apb::PBArchiveMetaData & metaArchive, std::vector<std::uint64_t> & numberDirChildren);
+void checkArchiveSizes(std::uint64_t metaSize, std::uint64_t contentSize, std::uint64_t inputFileSize);
+int computeArchiveSize(struct inode* inode, void* pointerToArchiveInfo);
+apb::PBArchiveMetaData getMetaDataFromArchive(QFile & input, std::uint64_t metaSize);
 QString getPathInArchive(struct inode* inode);
-void recursiveUnpack(const std::string& dstUnpackPath, std::uint64_t curIndex,
-                     const apb::PBArchiveMetaData &metaArchive,
-                     const QByteArray& archives, const std::vector<std::vector<uint64_t> > &fsTree);
+std::uint64_t getSize(QFile & input);
+void printInodeToQTextStream(struct inode* inode, QTextStream & qTextStream, std::uint64_t spaceCount);
+void restoreDirsTime(const std::vector<DirTimeSetTask> & dirsQueue);
+void updateDirentInPBArchiveMetaData(std::uint64_t & direntIndexInPBArchiveMetaData, APS* aps, apb::PBDirEntMetaData& tempMeta);
+void unpackDirFromArchive(struct inode * inode, AUS* aus, const apb::PBDirEntMetaData & curDirent, QString & path);
+int unpackInodeFromArchive(struct inode* inode, void* pointerToAus);
+void unpackRegfileFromArchive(AUS* aus, const apb::PBDirEntMetaData & curDirent, QString & path);
+void writeDirentIndexInPBArchiveMetaData(std::uint64_t & direntIndexInPBArchiveMetaData, struct inode* inode, APS* aps);
 
 
+///////////////////////////////////////////
+///////////////// PACK ////////////////////
+///////////////////////////////////////////
 
-QString ArchiverUtils::getDirentName(const QString & path)
-{
-    QDir dir(path);
-    return dir.dirName();
+void Archiver::pack(const QString &srcPath, const QString &dstArchiverPath) {
+    QByteArray srcPathByteArray = srcPath.toLatin1();
+    std::unique_ptr<fs_tree, fs_treeDeleter> tree(fs_tree_collect(srcPathByteArray.data()));
+
+    ArchiveInfo archiveInfo;
+    fs_tree_bfs(tree.get(), computeArchiveSize, static_cast<void*>(&archiveInfo));
+
+    std::unique_ptr<char[],std::default_delete<char[]> > filesContent(new char [archiveInfo.contentSize]);
+    APS aps(filesContent.get(), ArchiverUtils::getDirAbsPath(srcPath));
+
+    fs_tree_bfs(tree.get(), addInodeToArchive, static_cast<void*>(&aps));
+
+    QFile output(dstArchiverPath);
+    std::uint64_t metaSize = aps.metaArchive.ByteSize();
+    std::unique_ptr<char[],std::default_delete<char[]> > meta(new char [metaSize]);
+    output.open(QIODevice::WriteOnly);
+
+    if (!aps.metaArchive.SerializeToArray(meta.get(), metaSize))
+        throw Archiver::ArchiverException("Failed to serialize meta info of" + srcPath);
+
+    if ((size_t)output.write((char*)&metaSize, ArchiverUtils::byteSizeOfNumber) < ArchiverUtils::byteSizeOfNumber)
+        throw Archiver::ArchiverException("Failed to write metaSize of" + srcPath);
+
+    if ((size_t)output.write((char*)&archiveInfo.contentSize, ArchiverUtils::byteSizeOfNumber) < ArchiverUtils::byteSizeOfNumber)
+        throw Archiver::ArchiverException("Failed to write contentSize of " + srcPath);
+
+    if ((size_t)output.write(meta.get(), metaSize) < metaSize)
+        throw Archiver::ArchiverException("Failed to write meta of " + srcPath);
+
+    if ((size_t)output.write(filesContent.get(), archiveInfo.contentSize) < archiveInfo.contentSize)
+        throw Archiver::ArchiverException("Failed to write filesContent of " + srcPath);
 }
 
-QString ArchiverUtils::getDirAbsPath(const QString & path)
-{
-    QFileInfo fileInfo(path);
-    return fileInfo.absoluteDir().absolutePath() + QDir::separator();
-}
+int computeArchiveSize(struct inode* inode, void* pointerToArchiveInfo) {
+    if ((inode->type != INODE_REG_FILE) && (inode->type != INODE_DIR))
+        throw Archiver::ArchiverException(QString("Unexpected type of file. File: ") + inode->name);
+    LOG("computeArchiveSize: %s\n", inode->name);
 
-int computeArchiveSize(struct inode* inode, void* pointerToArchiveInfo)
-{
-	if ((inode->type != INODE_REG_FILE) && (inode->type != INODE_DIR))
-	{
-        qCritical() << "Unexpected type of file. File: " << inode->name << '\n';
-		return 1;
-	}
-    LOG("name: %s \n", inode->name);
     ArchiveInfo* archiveInfo = static_cast<ArchiveInfo*>(pointerToArchiveInfo);
     if (inode->type == INODE_REG_FILE)
         archiveInfo->contentSize += inode->attrs.st_size;
     return 1;
 }
 
-void writeDirentIndexInPBArchiveMetaData(std::uint64_t & direntIndexInPBArchiveMetaData, struct inode* inode, APS* aps)
-{
-    if (inode->user_data == NULL)
-    {
-        direntIndexInPBArchiveMetaData = aps->metaArchive.pbdirentmetadata_size();
-        aps->metaArchive.add_pbdirentmetadata();
-    }
-    else
-    {
-        direntIndexInPBArchiveMetaData = (std::uint64_t)inode->user_data;
-    }
-}
-
-void updateDirentInPBArchiveMetaData(std::uint64_t & direntIndexInPBArchiveMetaData, APS* aps, apb::PBDirEntMetaData& tempMeta)
-{
-    if (aps->metaArchive.pbdirentmetadata().Get(direntIndexInPBArchiveMetaData).has_parentix())
-    {
-        tempMeta.set_parentix(aps->metaArchive.pbdirentmetadata().Get(direntIndexInPBArchiveMetaData).parentix());
-    }
-    else
-    {
-        tempMeta.set_parentix(direntIndexInPBArchiveMetaData);
-    }
-    aps->metaArchive.mutable_pbdirentmetadata()->Mutable(direntIndexInPBArchiveMetaData)->Swap(&tempMeta);
-}
-
-int addInodeToArchive(struct inode* inode, void* pointerToAps)
-{
+int addInodeToArchive(struct inode* inode, void* pointerToAps) {
     APS* aps = static_cast<APS*>(pointerToAps);
 
     apb::PBDirEntMetaData tempMeta;
@@ -175,53 +133,65 @@ int addInodeToArchive(struct inode* inode, void* pointerToAps)
     return 1;
 }
 
-void unpackRegfileFromArchive(AUS* aus, const apb::PBDirEntMetaData & curDirent, QString & path)
-{
-    std::string pathStdString = path.toStdString();
-    int fileDescriptor;
-    timeval time[2];
-    fileDescriptor = open(pathStdString.c_str(), O_WRONLY | O_CREAT, curDirent.mode());
-    if (fileDescriptor == -1)
-    {
-        qCritical() << "Error in opening " << path << '\n';
-        return ;
+void writeDirentIndexInPBArchiveMetaData(std::uint64_t & direntIndexInPBArchiveMetaData, struct inode* inode, APS* aps) {
+    if (inode->user_data == NULL) {
+        direntIndexInPBArchiveMetaData = aps->metaArchive.pbdirentmetadata_size();
+        aps->metaArchive.add_pbdirentmetadata();
+    } else {
+        direntIndexInPBArchiveMetaData = (std::uint64_t)inode->user_data;
     }
-    write(fileDescriptor, aus->filesContent + curDirent.pbregfilemetadata().contentoffset(),
-          curDirent.pbregfilemetadata().contentsize());
-    if (fchown(fileDescriptor, curDirent.uid(), curDirent.gid()))
-        qCritical() << "Error in chowning " << path << '\n';
-    time[0].tv_sec = curDirent.atime();
-    time[0].tv_usec = 0;
-    time[1].tv_sec = curDirent.mtime();
-    time[1].tv_usec = 0;
-    if (futimes(fileDescriptor, time))
-        qCritical() << "Error in changing time " << path << '\n';
-    close(fileDescriptor);
 }
 
-void unpackDirFromArchive(struct inode * inode, AUS* aus, const apb::PBDirEntMetaData & curDirent, QString & path)
-{
-    std::string pathStdString = path.toStdString();
-    int fileDescriptor;
-    mkdir(pathStdString.c_str(), inode->attrs.st_mode);
-    fileDescriptor = open(pathStdString.c_str(), O_RDONLY | O_DIRECTORY);
-    if (fileDescriptor == -1)
-    {
-        qCritical() << "Error in opening " << path << '\n';
-        return ;
+void updateDirentInPBArchiveMetaData(std::uint64_t & direntIndexInPBArchiveMetaData, APS* aps, apb::PBDirEntMetaData& tempMeta) {
+    if (aps->metaArchive.pbdirentmetadata().Get(direntIndexInPBArchiveMetaData).has_parentix()) {
+        tempMeta.set_parentix(aps->metaArchive.pbdirentmetadata().Get(direntIndexInPBArchiveMetaData).parentix());
+    } else {
+        tempMeta.set_parentix(direntIndexInPBArchiveMetaData);
     }
-    fchown(fileDescriptor, curDirent.uid(), curDirent.gid());
-    aus->dirsQueue.push_back(DirTimeSetTask(fileDescriptor, curDirent.atime(), curDirent.mtime()));
+    aps->metaArchive.mutable_pbdirentmetadata()->Mutable(direntIndexInPBArchiveMetaData)->Swap(&tempMeta);
 }
 
-int unpackInodeFromArchive(struct inode* inode, void* pointerToAus)
-{
+
+///////////////////////////////////////////
+//////////////// UNPACK ///////////////////
+///////////////////////////////////////////
+
+void Archiver::unpack(const QString &srcArchivePath, const QString &dstPath) {
+    QFile input(srcArchivePath);
+    if (!input.open(QIODevice::ReadOnly))
+        throw ArchiverException("Error with opening " + srcArchivePath);
+
+    std::uint64_t metaSize = getSize(input);
+    std::uint64_t contentSize = getSize(input);
+
+    checkArchiveSizes(metaSize, contentSize, input.size());
+
+    apb::PBArchiveMetaData metaArchive = getMetaDataFromArchive(input, metaSize);
+
+    std::vector<std::uint64_t> numberDirChildren(metaArchive.pbdirentmetadata_size());
+    calcNumberDirChildren(metaArchive, numberDirChildren);
+
+    std::unique_ptr<fs_tree, fs_treeDeleter> fsTree(create_fs_tree());
+    buildFsTree(fsTree, metaArchive, numberDirChildren);
+
+    std::unique_ptr<char[],std::default_delete<char[]> > filesContent(new char [contentSize]);
+
+    if ((std::uint64_t)input.read(filesContent.get(), contentSize) < contentSize) {
+        throw ArchiverException("Error with reading content from " + srcArchivePath);
+    }
+
+    AUS aus(filesContent.get(), ArchiverUtils::getDirAbsPath(dstPath), &metaArchive);
+    fs_tree_bfs(fsTree.get(), unpackInodeFromArchive, static_cast<void*>(&aus));
+
+    restoreDirsTime(aus.dirsQueue);
+}
+
+int unpackInodeFromArchive(struct inode* inode, void* pointerToAus) {
     AUS* aus = static_cast<AUS*>(pointerToAus);
     const apb::PBDirEntMetaData& curDirent = aus->metaArchive->pbdirentmetadata((std::uint64_t)inode->user_data);
     QString path = aus->dirAbsPath + getPathInArchive(inode);
 
-    switch (inode->type)
-    {
+    switch (inode->type) {
     case INODE_REG_FILE:
         unpackRegfileFromArchive(aus, curDirent, path);
         break;
@@ -235,10 +205,46 @@ int unpackInodeFromArchive(struct inode* inode, void* pointerToAus)
     return 1;
 }
 
-void restoreDirsTime(const std::vector<DirTimeSetTask> & dirsQueue)
-{
-    for (int i = dirsQueue.size()-1; i >= 0; --i)
-    {
+void unpackRegfileFromArchive(AUS* aus, const apb::PBDirEntMetaData & curDirent, QString & path) {
+    std::string pathStdString = path.toStdString();
+    int fileDescriptor;
+    timeval time[2];
+    fileDescriptor = open(pathStdString.c_str(), O_WRONLY | O_CREAT, curDirent.mode());
+    if (fileDescriptor == -1) {
+        qCritical() << "Error in opening " << path << '\n';
+        return ;
+    }
+    write(fileDescriptor, aus->filesContent + curDirent.pbregfilemetadata().contentoffset(),
+          curDirent.pbregfilemetadata().contentsize());
+
+    if (fchown(fileDescriptor, curDirent.uid(), curDirent.gid()))
+        qCritical() << "Error in chowning " << path << '\n';
+
+    time[0].tv_sec = curDirent.atime();
+    time[0].tv_usec = 0;
+    time[1].tv_sec = curDirent.mtime();
+    time[1].tv_usec = 0;
+    if (futimes(fileDescriptor, time))
+        qCritical() << "Error in changing time " << path << '\n';
+
+    close(fileDescriptor);
+}
+
+void unpackDirFromArchive(struct inode * inode, AUS* aus, const apb::PBDirEntMetaData & curDirent, QString & path) {
+    std::string pathStdString = path.toStdString();
+    int fileDescriptor;
+    mkdir(pathStdString.c_str(), inode->attrs.st_mode);
+    fileDescriptor = open(pathStdString.c_str(), O_RDONLY | O_DIRECTORY);
+    if (fileDescriptor == -1) {
+        qCritical() << "Error in opening " << path << '\n';
+        return ;
+    }
+    fchown(fileDescriptor, curDirent.uid(), curDirent.gid());
+    aus->dirsQueue.push_back(DirTimeSetTask(fileDescriptor, curDirent.atime(), curDirent.mtime()));
+}
+
+void restoreDirsTime(const std::vector<DirTimeSetTask> & dirsQueue) {
+    for (int i = dirsQueue.size()-1; i >= 0; --i) {
         timeval time[2];
         time[0].tv_sec = dirsQueue[i].atime;
         time[1].tv_sec = dirsQueue[i].mtime;
@@ -250,158 +256,58 @@ void restoreDirsTime(const std::vector<DirTimeSetTask> & dirsQueue)
     }
 }
 
-Archiver::Archiver()
-{}
 
-QString getPathInArchive(struct inode* inode)
-{
-    if (inode->parent == NULL)
-        return ArchiverUtils::getDirentName(inode->name);
-    else
-        return getPathInArchive(inode->parent) + QDir::separator() + inode->name;
+///////////////////////////////////////////
+/////// GET_ARCHIVE_WITHOUT_CONTENT ///////
+///////////////////////////////////////////
+
+QByteArray Archiver::getArchiveWithoutContent(const QString & srcArchivePath) {
+    QByteArray archiveWithoutContent;
+
+    QFile input(srcArchivePath);
+    if (!input.open(QIODevice::ReadOnly)) {
+        throw ArchiverException("Error with opening " + srcArchivePath);
+    }
+
+    std::uint64_t metaSize = getSize(input);
+    std::uint64_t contentSize = getSize(input);
+
+    checkArchiveSizes(metaSize, contentSize, input.size());
+
+    std::unique_ptr<char[],std::default_delete<char[]> > bufferForMeta(new char [metaSize]);
+    if ((std::uint64_t)input.read(bufferForMeta.get(), metaSize) < metaSize) {
+        throw ArchiverException("Error with reading meta");
+    }
+
+    archiveWithoutContent.resize(metaSize + 2 * ArchiverUtils::byteSizeOfNumber);
+
+    contentSize = 0;
+    memcpy(archiveWithoutContent.data(), &metaSize, ArchiverUtils::byteSizeOfNumber);
+    memcpy(archiveWithoutContent.data() + ArchiverUtils::byteSizeOfNumber,
+           &contentSize, ArchiverUtils::byteSizeOfNumber);
+    memcpy(archiveWithoutContent.data() + 2 * ArchiverUtils::byteSizeOfNumber,
+           bufferForMeta.get(), metaSize);
+
+    return archiveWithoutContent;
 }
 
-void Archiver::pack(const QString &srcPath, const QString &dstArchiverPath)
-{
-    QByteArray srcPathByteArray = srcPath.toLatin1();
-    std::unique_ptr<fs_tree, fs_treeDeleter> tree(fs_tree_collect(srcPathByteArray.data()));
 
-    ArchiveInfo archiveInfo;
-    fs_tree_bfs(tree.get(), computeArchiveSize, static_cast<void*>(&archiveInfo));
+///////////////////////////////////////////
+////////// PRINT_ARCHIVE_FS_TREE //////////
+///////////////////////////////////////////
 
-    std::unique_ptr<char[],std::default_delete<char[]> > filesContent(new char [archiveInfo.contentSize]);
-    APS aps(filesContent.get(), ArchiverUtils::getDirAbsPath(srcPath));
-
-    fs_tree_bfs(tree.get(), addInodeToArchive, static_cast<void*>(&aps));
-
-    std::fstream output(dstArchiverPath.toStdString(), std::ios::out | std::ios::trunc | std::ios::binary);
-    if (!aps.metaArchive.SerializeToOstream(&output)) {
-          qCritical() << "Failed to write meta info." << '\n';
-    }
-    output.write(aps.filesContent, archiveInfo.contentSize);
-}
-
-
-void calcNumberDirChildren(apb::PBArchiveMetaData & metaArchive, std::vector<std::uint64_t> & numberDirChildren)
-{
-    for (std::uint64_t i = 0; i < metaArchive.pbdirentmetadata_size(); ++i)
-    {
-        if (i == metaArchive.pbdirentmetadata(i).parentix())
-            continue;
-        ++numberDirChildren[metaArchive.pbdirentmetadata(i).parentix()];
-    }
-}
-
-void buildFsTree(std::unique_ptr<fs_tree, fs_treeDeleter> & fsTree, apb::PBArchiveMetaData & metaArchive, std::vector<std::uint64_t> & numberDirChildren)
-{
-    std::vector<std::uint64_t> curDirChildren(metaArchive.pbdirentmetadata_size());
-    std::vector<inode*> indexToInodePointer(metaArchive.pbdirentmetadata_size());
-
-    for (std::uint64_t i = 0; i < metaArchive.pbdirentmetadata_size(); ++i)
-    {
-        const apb::PBDirEntMetaData& curDirent = metaArchive.pbdirentmetadata(i);
-        inode* curInode;
-
-        if (S_ISDIR(curDirent.mode()))
-        {
-            dir_inode* curDirInode = create_dir_inode();
-            unpack_dir_inode(&curDirent, curDirInode, indexToInodePointer, numberDirChildren[i], i);
-            curInode = reinterpret_cast<inode*>(curDirInode);
-        } else
-            if (S_ISREG(curDirent.mode()))
-            {
-                regular_file_inode* curRegFileInode = create_regular_file_inode();
-                unpack_regfile_inode(&curDirent, curRegFileInode, indexToInodePointer, i);
-                curInode = reinterpret_cast<inode*>(curRegFileInode);
-            }
-
-        LOG("buildFsTree on %s\n", curInode->name);
-
-        if (curDirent.parentix() != i)
-        {
-            reinterpret_cast<dir_inode*>(indexToInodePointer[curDirent.parentix()])->children[curDirChildren[curDirent.parentix()]++] = curInode;
-        }
-
-        if (!i)
-        {
-            init_fs_tree_from_head(fsTree.get(), curInode);
-
-        }
-    }
-}
-
-void Archiver::unpack(const QString &srcArchivePath, const QString &dstPath)
-{
-    //std::ifstream inputFileWithMeta(srcArchivePath.toStdString() + std::string("meta"), std::ios::binary);
-    std::ifstream inputFileWithMeta(srcArchivePath.toStdString(), std::ios::binary);
-    apb::PBArchiveMetaData metaArchive;
-    metaArchive.ParseFromIstream(&inputFileWithMeta);
-
-    std::vector<std::uint64_t> numberDirChildren(metaArchive.pbdirentmetadata_size());
-    calcNumberDirChildren(metaArchive, numberDirChildren);
-
-    std::unique_ptr<fs_tree, fs_treeDeleter> fsTree(create_fs_tree());
-    buildFsTree(fsTree, metaArchive, numberDirChildren);
-
-    inputFileWithMeta.close();
-    inputFileWithMeta.open(srcArchivePath.toStdString(), std::ios::binary);
-    //Don't ask me why here "-2". I don't know.
-    std::uint64_t contentOffset = metaArchive.ByteSize()-2;
-    LOG("\ncontentOffset = %ld\n", contentOffset);
-    inputFileWithMeta.seekg(0, std::ios::end);
-    LOG("allfile = %ld\n", inputFileWithMeta.tellg());
-    std::uint64_t sizeOfContent = inputFileWithMeta.tellg() - contentOffset;
-    LOG("sizeOfContent = %ld\n", sizeOfContent);
-    inputFileWithMeta.seekg(contentOffset, std::ios::beg);
-    LOG("curOffset = %ld\n\n", inputFileWithMeta.tellg());
-
-    std::unique_ptr<char[],std::default_delete<char[]> > filesContent(new char [sizeOfContent]);
-    inputFileWithMeta.read(filesContent.get(), sizeOfContent);
-
-    AUS aus(filesContent.get(), ArchiverUtils::getDirAbsPath(dstPath), &metaArchive);
-    fs_tree_bfs(fsTree.get(), unpackInodeFromArchive, static_cast<void*>(&aus));
-
-    restoreDirsTime(aus.dirsQueue);
-}
-
-void printInodeToQTextStream(struct inode* inode, QTextStream & qTextStream, std::uint64_t spaceCount)
-{
-    LOG("visit %s\n", inode->name);
-    for (std::uint64_t i = 0; i < spaceCount; ++i)
-        qTextStream << " ";
-
-    qTextStream << inode->name << "\n";
-
-    if (qTextStream.string() != 0) {
-        LOG("qTextStream.string()->size() %d\n", qTextStream.string()->size());
+void Archiver::printArchiveFsTree(const QString &srcArchivePath, QTextStream & qTextStream) {
+    QFile input(srcArchivePath);
+    if (!input.open(QIODevice::ReadOnly)) {
+        throw ArchiverException("Error with opening " + srcArchivePath);
     }
 
-    if (qTextStream.status() == QTextStream::WriteFailed) {
-        qCritical() << "Error in writing " << inode->name << " in qTextStream" << '\n';
-    }
+    std::uint64_t metaSize = getSize(input);
+    std::uint64_t contentSize = getSize(input);
 
-    if (inode->type == INODE_DIR)
-    {
-        dir_inode* dir = (dir_inode*)inode;
-        for (size_t i = 0; i < dir->num_children; ++i)
-        {
-            printInodeToQTextStream(dir->children[i], qTextStream, spaceCount + 1);
-        }
-    }
-}
+    checkArchiveSizes(metaSize, contentSize, input.size());
 
-void Archiver::printArchiveFsTree(const QString &srcArchivePath, QTextStream & qTextStream)
-{
-    LOG("printArchiveFsTree on file: %s\n", srcArchivePath.toStdString().c_str());
-    std::ifstream inputFileWithMeta(srcArchivePath.toStdString(), std::ios::binary);
-
-    LOG("inputFileWithMeta.is_open(): %d\n", inputFileWithMeta.is_open());
-    apb::PBArchiveMetaData metaArchive;
-    if (!metaArchive.ParseFromIstream(&inputFileWithMeta))
-    {
-        qCritical() << "Error with parsing archive from srcArchivePath" << '\n';
-        return;
-    }
+    apb::PBArchiveMetaData metaArchive = getMetaDataFromArchive(input, metaSize);
 
     std::vector<std::uint64_t> numberDirChildren(metaArchive.pbdirentmetadata_size());
     calcNumberDirChildren(metaArchive, numberDirChildren);
@@ -410,6 +316,122 @@ void Archiver::printArchiveFsTree(const QString &srcArchivePath, QTextStream & q
     buildFsTree(fsTree, metaArchive, numberDirChildren);
 
     printInodeToQTextStream(fsTree.get()->head, qTextStream, 0);
-    inputFileWithMeta.close();
 }
 
+void printInodeToQTextStream(struct inode* inode, QTextStream & qTextStream, std::uint64_t spaceCount) {
+    LOG("visit %s\n", inode->name);
+    for (std::uint64_t i = 0; i < spaceCount; ++i)
+        qTextStream << " ";
+
+    qTextStream << inode->name << "\n";
+
+    if (qTextStream.status() == QTextStream::WriteFailed) {
+        qCritical() << "Error in writing " << inode->name << " in qTextStream" << '\n';
+    }
+
+    if (inode->type == INODE_DIR) {
+        dir_inode* dir = (dir_inode*)inode;
+        for (size_t i = 0; i < dir->num_children; ++i) {
+            printInodeToQTextStream(dir->children[i], qTextStream, spaceCount + 1);
+        }
+    }
+}
+
+
+///////////////////////////////////////////
+/////////// ArchiverUtils /////////////////
+///////////////////////////////////////////
+
+QString ArchiverUtils::getDirentName(const QString & path) {
+    QDir dir(path);
+    return dir.dirName();
+}
+
+QString ArchiverUtils::getDirAbsPath(const QString & path) {
+    QFileInfo fileInfo(path);
+    return fileInfo.absoluteDir().absolutePath() + QDir::separator();
+}
+
+
+///////////////////////////////////////////
+///////// Support Functions ///////////////
+///////////////////////////////////////////
+
+QString getPathInArchive(struct inode* inode) {
+    if (inode->parent == NULL)
+        return ArchiverUtils::getDirentName(inode->name);
+    else
+        return getPathInArchive(inode->parent) + QDir::separator() + inode->name;
+}
+
+void calcNumberDirChildren(apb::PBArchiveMetaData & metaArchive, std::vector<std::uint64_t> & numberDirChildren) {
+    for (std::uint64_t i = 0; i < (std::uint64_t)metaArchive.pbdirentmetadata_size(); ++i) {
+        if (i == metaArchive.pbdirentmetadata(i).parentix())
+            continue;
+        ++numberDirChildren[metaArchive.pbdirentmetadata(i).parentix()];
+    }
+}
+
+void buildFsTree(std::unique_ptr<fs_tree, fs_treeDeleter> & fsTree, apb::PBArchiveMetaData & metaArchive,
+                 std::vector<std::uint64_t> & numberDirChildren) {
+    std::vector<std::uint64_t> curDirChildren(metaArchive.pbdirentmetadata_size());
+    std::vector<inode*> indexToInodePointer(metaArchive.pbdirentmetadata_size());
+
+    for (std::uint64_t i = 0; i < (std::uint64_t)metaArchive.pbdirentmetadata_size(); ++i) {
+        const apb::PBDirEntMetaData& curDirent = metaArchive.pbdirentmetadata(i);
+        inode* curInode;
+
+        if (S_ISDIR(curDirent.mode())) {
+            dir_inode* curDirInode = create_dir_inode();
+            unpack_dir_inode(&curDirent, curDirInode, indexToInodePointer, numberDirChildren[i], i);
+            curInode = reinterpret_cast<inode*>(curDirInode);
+        } else
+            if (S_ISREG(curDirent.mode())) {
+                regular_file_inode* curRegFileInode = create_regular_file_inode();
+                unpack_regfile_inode(&curDirent, curRegFileInode, indexToInodePointer, i);
+                curInode = reinterpret_cast<inode*>(curRegFileInode);
+            }
+
+        LOG("buildFsTree on %s\n", curInode->name);
+
+        if (curDirent.parentix() != i) {
+            reinterpret_cast<dir_inode*>(indexToInodePointer[curDirent.parentix()])->children[curDirChildren[curDirent.parentix()]++] = curInode;
+        }
+
+        if (!i) {
+            init_fs_tree_from_head(fsTree.get(), curInode);
+        }
+    }
+}
+
+std::uint64_t getSize(QFile & input) {
+    std::unique_ptr<char[],std::default_delete<char[]> > bufferForNumber(new char [ArchiverUtils::byteSizeOfNumber]);
+
+    if ((size_t)input.read(bufferForNumber.get(), ArchiverUtils::byteSizeOfNumber) < ArchiverUtils::byteSizeOfNumber) {
+        throw Archiver::ArchiverException("Error with reading size.");
+    }
+
+    return *((std::uint64_t*)bufferForNumber.get());
+}
+
+void checkArchiveSizes(std::uint64_t metaSize, std::uint64_t contentSize, std::uint64_t inputFileSize) {
+    if (metaSize + contentSize + 2 * ArchiverUtils::byteSizeOfNumber != inputFileSize) {
+        throw Archiver::ArchiverException(QString("Error with size of file.\nExpecting: ")
+                                + (metaSize + contentSize + 2 * ArchiverUtils::byteSizeOfNumber)
+                                + QString(". Got: ") + inputFileSize);
+    }
+}
+
+apb::PBArchiveMetaData getMetaDataFromArchive(QFile & input, std::uint64_t metaSize) {
+    std::unique_ptr<char[],std::default_delete<char[]> > bufferForMeta(new char [metaSize]);
+    if ((std::uint64_t)input.read(bufferForMeta.get(), metaSize) < metaSize) {
+        throw Archiver::ArchiverException("Error with reading meta");
+    }
+
+    apb::PBArchiveMetaData metaArchive;
+    if (!metaArchive.ParseFromArray(bufferForMeta.get(), metaSize)) {
+        throw Archiver::ArchiverException("Error with parse meta");
+    }
+
+    return metaArchive;
+}
