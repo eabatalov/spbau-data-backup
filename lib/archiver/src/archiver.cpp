@@ -28,7 +28,7 @@
 
 namespace apb = ArchiverUtils::protobufStructs;
 
-#define DEBUG_FLAG false
+#define DEBUG_FLAG true
 #define LOG(format, var) do{ \
     if (DEBUG_FLAG) fprintf(stderr, "line: %d.  " format, __LINE__ ,var); \
     }while(0)
@@ -49,6 +49,7 @@ void calcNumberDirChildren(apb::PBArchiveMetaData & metaArchive, std::vector<std
 void checkArchiveSizes(std::uint64_t metaSize, std::uint64_t contentSize, std::uint64_t inputFileSize);
 int computeArchiveSize(struct inode* inode, void* pointerToArchiveInfo);
 apb::PBArchiveMetaData getMetaDataFromArchive(QFile & input, std::uint64_t metaSize);
+QString getPathInArchive(const apb::PBArchiveMetaData & archiveMeta, int index);
 QString getPathInArchive(struct inode* inode);
 std::uint64_t getSize(QFile & input);
 void printInodeToQTextStream(struct inode* inode, QTextStream & qTextStream, std::uint64_t spaceCount);
@@ -58,7 +59,12 @@ void unpackDirFromArchive(struct inode * inode, AUS* aus, const apb::PBDirEntMet
 int unpackInodeFromArchive(struct inode* inode, void* pointerToAus);
 void unpackRegfileFromArchive(AUS* aus, const apb::PBDirEntMetaData & curDirent, QString & path);
 void writeDirentIndexInPBArchiveMetaData(std::uint64_t & direntIndexInPBArchiveMetaData, struct inode* inode, APS* aps);
+void writeOneFileToArcive(QString path, std::uint64_t contentOffset, QFile * archive, std::uint64_t size);
+void readOneFileFromArcive(QString path, std::uint64_t contentOffset, QFile * archive, std::uint64_t size);
+void writeContentToArchive(const QString & srcPath , const apb::PBArchiveMetaData & metaArchive, const std::uint64_t contentOffset, QFile * archive);
+void writeEmptyContent(QFile * file, std::uint64_t size);
 
+const static std::uint64_t MMAP_BUFFER_SIZE = 4096;
 
 ///////////////////////////////////////////
 ///////////////// PACK ////////////////////
@@ -71,15 +77,15 @@ void Archiver::pack(const QString &srcPath, const QString &dstArchiverPath) {
     ArchiveInfo archiveInfo;
     fs_tree_bfs(tree.get(), computeArchiveSize, static_cast<void*>(&archiveInfo));
 
-    std::unique_ptr<char[],std::default_delete<char[]> > filesContent(new char [archiveInfo.contentSize]);
-    APS aps(filesContent.get(), ArchiverUtils::getDirAbsPath(srcPath));
+    //std::unique_ptr<char[],std::default_delete<char[]> > filesContent(new char [archiveInfo.contentSize]);
+    APS aps(ArchiverUtils::getDirAbsPath(srcPath));
 
     fs_tree_bfs(tree.get(), addInodeToArchive, static_cast<void*>(&aps));
 
     QFile output(dstArchiverPath);
     std::uint64_t metaSize = aps.metaArchive.ByteSize();
     std::unique_ptr<char[],std::default_delete<char[]> > meta(new char [metaSize]);
-    output.open(QIODevice::WriteOnly);
+    output.open(QIODevice::ReadWrite);
 
     if (!aps.metaArchive.SerializeToArray(meta.get(), metaSize))
         throw Archiver::ArchiverException("Failed to serialize meta info of" + srcPath);
@@ -93,8 +99,12 @@ void Archiver::pack(const QString &srcPath, const QString &dstArchiverPath) {
     if ((size_t)output.write(meta.get(), metaSize) < metaSize)
         throw Archiver::ArchiverException("Failed to write meta of " + srcPath);
 
-    if ((size_t)output.write(filesContent.get(), archiveInfo.contentSize) < archiveInfo.contentSize)
-        throw Archiver::ArchiverException("Failed to write filesContent of " + srcPath);
+    writeEmptyContent(&output, archiveInfo.contentSize);
+
+    writeContentToArchive(aps.dirAbsPath, aps.metaArchive, ArchiverUtils::byteSizeOfNumber * 2 + metaSize, &output);
+
+//    if ((size_t)output.write(filesContent.get(), archiveInfo.contentSize) < archiveInfo.contentSize)
+//        throw Archiver::ArchiverException("Failed to write filesContent of " + srcPath);
 }
 
 int computeArchiveSize(struct inode* inode, void* pointerToArchiveInfo) {
@@ -118,8 +128,7 @@ int addInodeToArchive(struct inode* inode, void* pointerToAps) {
 
     switch (inode->type) {
     case INODE_REG_FILE:
-        pack_regfile_inode(reinterpret_cast<regular_file_inode*>(inode), &tempMeta,
-            aps->dirAbsPath + getPathInArchive(inode), aps->filesContent, aps->contentFreePosition);
+        pack_regfile_inode(reinterpret_cast<regular_file_inode*>(inode), &tempMeta, aps->contentFreePosition);
         break;
     case INODE_DIR:
         pack_dir_inode(reinterpret_cast<dir_inode*>(inode), &tempMeta, &(aps->metaArchive), direntIndexInPBArchiveMetaData);
@@ -151,6 +160,65 @@ void updateDirentInPBArchiveMetaData(std::uint64_t & direntIndexInPBArchiveMetaD
     aps->metaArchive.mutable_pbdirentmetadata()->Mutable(direntIndexInPBArchiveMetaData)->Swap(&tempMeta);
 }
 
+void writeContentToArchive(const QString & srcPath , const apb::PBArchiveMetaData & metaArchive, const std::uint64_t contentOffset, QFile * archive) {
+    for (int i = 0; i < metaArchive.pbdirentmetadata_size(); ++i) {
+        if (metaArchive.pbdirentmetadata(i).has_pbregfilemetadata()) {
+            QString path = srcPath + getPathInArchive(metaArchive, i);
+            std::uint64_t offsetToFile = metaArchive.pbdirentmetadata(i).pbregfilemetadata().contentoffset();
+            std::uint64_t sizeOfFile = metaArchive.pbdirentmetadata(i).pbregfilemetadata().contentsize();
+            writeOneFileToArcive(path, contentOffset + offsetToFile, archive, sizeOfFile);
+        }
+    }
+}
+
+void writeEmptyContent(QFile * file, std::uint64_t size) {
+    while (size > 0) {
+        int temp = 0;
+        std::uint64_t actualSize = std::min(sizeof(temp), size);
+        file->write((char*)&temp, actualSize);
+        size -= actualSize;
+    }
+}
+
+void writeOneFileToArcive(QString path, std::uint64_t contentOffset, QFile * archive, std::uint64_t size) {
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) {
+        throw Archiver::ArchiverException(QString("Cannot open file: ") + path);
+    }
+
+
+    while (size > 0) {
+        std::uint64_t actualSize = std::min(MMAP_BUFFER_SIZE, size);
+
+        LOG("actualSize = %lld \n", actualSize);
+        LOG("file.size() = %lld \n", file.size());
+        LOG("contentOffset = %lld \n", contentOffset);
+        LOG("archive.size() = %lld \n", archive->size());
+
+
+        uchar* mmap = file.map(0, actualSize);
+        if (mmap == NULL) {
+            throw Archiver::ArchiverException(QString("Cannot mapped file: ") + path);
+        }
+        uchar* archiveMmap = archive->map(contentOffset, actualSize);
+        if (archiveMmap == NULL) {
+            throw Archiver::ArchiverException(QString("Cannot mapped archive with file: ") + path);
+        }
+
+        memmove(archiveMmap, mmap, actualSize);
+
+
+        if (!file.unmap(mmap)) {
+            throw Archiver::ArchiverException(QString("Cannot unmapped file: ") + path);
+        }
+        if (!archive->unmap(archiveMmap)) {
+            throw Archiver::ArchiverException(QString("Cannot unmapped archive with file: ") + path);
+        }
+        contentOffset += actualSize;
+        size -= actualSize;
+    }
+}
+
 
 ///////////////////////////////////////////
 //////////////// UNPACK ///////////////////
@@ -174,13 +242,7 @@ void Archiver::unpack(const QString &srcArchivePath, const QString &dstPath) {
     std::unique_ptr<fs_tree, fs_treeDeleter> fsTree(create_fs_tree());
     buildFsTree(fsTree, metaArchive, numberDirChildren);
 
-    std::unique_ptr<char[],std::default_delete<char[]> > filesContent(new char [contentSize]);
-
-    if ((std::uint64_t)input.read(filesContent.get(), contentSize) < contentSize) {
-        throw ArchiverException("Error with reading content from " + srcArchivePath);
-    }
-
-    AUS aus(filesContent.get(), ArchiverUtils::getDirAbsPath(dstPath), &metaArchive);
+    AUS aus(&input, ArchiverUtils::getDirAbsPath(dstPath), &metaArchive);
     fs_tree_bfs(fsTree.get(), unpackInodeFromArchive, static_cast<void*>(&aus));
 
     restoreDirsTime(aus.dirsQueue);
@@ -206,6 +268,8 @@ int unpackInodeFromArchive(struct inode* inode, void* pointerToAus) {
 }
 
 void unpackRegfileFromArchive(AUS* aus, const apb::PBDirEntMetaData & curDirent, QString & path) {
+    readOneFileFromArcive(path, ArchiverUtils::byteSizeOfNumber * 2 + aus->metaArchive->ByteSize() + curDirent.pbregfilemetadata().contentoffset(), aus->archive, curDirent.pbregfilemetadata().contentsize());
+
     std::string pathStdString = path.toStdString();
     int fileDescriptor;
     timeval time[2];
@@ -214,8 +278,9 @@ void unpackRegfileFromArchive(AUS* aus, const apb::PBDirEntMetaData & curDirent,
         qCritical() << "Error in opening " << path << '\n';
         return ;
     }
-    write(fileDescriptor, aus->filesContent + curDirent.pbregfilemetadata().contentoffset(),
-          curDirent.pbregfilemetadata().contentsize());
+
+//    write(fileDescriptor, aus->filesContent + curDirent.pbregfilemetadata().contentoffset(),
+//          curDirent.pbregfilemetadata().contentsize());
 
     if (fchown(fileDescriptor, curDirent.uid(), curDirent.gid()))
         qCritical() << "Error in chowning " << path << '\n';
@@ -256,6 +321,40 @@ void restoreDirsTime(const std::vector<DirTimeSetTask> & dirsQueue) {
     }
 }
 
+void readOneFileFromArcive(QString path, std::uint64_t contentOffset, QFile * archive, std::uint64_t size) {
+    QFile file(path);
+    if (!file.open(QIODevice::ReadWrite)) {
+        throw Archiver::ArchiverException(QString("Cannot open file: ") + path);
+    }
+
+    writeEmptyContent(&file, size);
+
+    while (size > 0) {
+        std::uint64_t actualSize = std::min(MMAP_BUFFER_SIZE, size);
+        LOG("actualSize = %lld \n", actualSize);
+        LOG("file.size() = %lld \n", file.size());
+        uchar* mmap = file.map(0, actualSize);
+        if (mmap == NULL) {
+            throw Archiver::ArchiverException(QString("Cannot mapped file: ") + path);
+        }
+        uchar* archiveMmap = archive->map(contentOffset, actualSize);
+        if (archiveMmap == NULL) {
+            throw Archiver::ArchiverException(QString("Cannot mapped archive with file: ") + path);
+        }
+
+        memmove(mmap, archiveMmap, actualSize);
+
+
+        if (!file.unmap(mmap)) {
+            throw Archiver::ArchiverException(QString("Cannot unmapped file: ") + path);
+        }
+        if (!archive->unmap(archiveMmap)) {
+            throw Archiver::ArchiverException(QString("Cannot unmapped archive with file: ") + path);
+        }
+        contentOffset += actualSize;
+        size -= actualSize;
+    }
+}
 
 ///////////////////////////////////////////
 /////// GET_ARCHIVE_WITHOUT_CONTENT ///////
@@ -357,11 +456,20 @@ QString ArchiverUtils::getDirAbsPath(const QString & path) {
 ///////// Support Functions ///////////////
 ///////////////////////////////////////////
 
+QString getPathInArchive(const apb::PBArchiveMetaData & archiveMeta, int index) {
+    if (archiveMeta.pbdirentmetadata(index).parentix() == index)
+        return ArchiverUtils::getDirentName(QString::fromStdString(archiveMeta.pbdirentmetadata(index).name()));
+    else
+        return getPathInArchive(archiveMeta, archiveMeta.pbdirentmetadata(index).parentix())
+                + QDir::separator() + QString::fromStdString(archiveMeta.pbdirentmetadata(index).name());
+}
+
 QString getPathInArchive(struct inode* inode) {
     if (inode->parent == NULL)
         return ArchiverUtils::getDirentName(inode->name);
     else
-        return getPathInArchive(inode->parent) + QDir::separator() + inode->name;
+        return getPathInArchive(inode->parent)
+                + QDir::separator() + inode->name;
 }
 
 void calcNumberDirChildren(apb::PBArchiveMetaData & metaArchive, std::vector<std::uint64_t> & numberDirChildren) {

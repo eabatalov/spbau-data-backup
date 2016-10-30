@@ -26,12 +26,15 @@ int main(int argc, char *argv[]) {
 
     try {
         if (!strcmp("-p", argv[1])) {
+            qDebug() << QString("START PACKING: ") + argv[2] + " " + argv[3] + "\n";
             Archiver::pack(argv[2], argv[3]);
         } else
             if (!strcmp("-u", argv[1])) {
+                qDebug() << QString("START UNPACKING: ") + argv[2] + " " + argv[3] + "\n";
                 Archiver::unpack(argv[2], argv[3]);
             } else
                 if (!strcmp("-c", argv[1])) {
+                    qDebug() << QString("START CHECKING: ") + argv[2] + " " + argv[3] + "\n";
                     checkArchiver(argv[2], argv[3]);
                 } else {
                     std::cerr << "Unknown first argument in cmd!\nPlease print one of:\n\"-p sourcePath outputFileArchive\" to pack sourcePath to outputFileArchive" << std::endl <<

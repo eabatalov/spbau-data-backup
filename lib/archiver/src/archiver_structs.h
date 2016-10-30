@@ -4,6 +4,7 @@
 #include <QString>
 #include <struct_serialization.pb.h>
 #include <vector>
+#include <QFile>
 
 struct ArchiveInfo {
     std::uint64_t contentSize;
@@ -11,14 +12,22 @@ struct ArchiveInfo {
         :contentSize(0) {}
 };
 
+//struct ArchivePackingState {
+//    char* filesContent;
+//    std::uint64_t contentFreePosition;
+//    QString dirAbsPath;
+//    ArchiverUtils::protobufStructs::PBArchiveMetaData metaArchive;
+//    ArchivePackingState(char* filesContent, const QString & dirAbsPath)
+//        :filesContent(filesContent)
+//        ,contentFreePosition(0)
+//        ,dirAbsPath(dirAbsPath) {}
+//};
 struct ArchivePackingState {
-    char* filesContent;
     std::uint64_t contentFreePosition;
     QString dirAbsPath;
     ArchiverUtils::protobufStructs::PBArchiveMetaData metaArchive;
-    ArchivePackingState(char* filesContent, const QString & dirAbsPath)
-        :filesContent(filesContent)
-        ,contentFreePosition(0)
+    ArchivePackingState(const QString & dirAbsPath)
+        :contentFreePosition(0)
         ,dirAbsPath(dirAbsPath) {}
 };
 
@@ -32,13 +41,24 @@ struct DirTimeSetTask {
         :fd(fd), atime(atime), mtime(mtime) {}
 };
 
+//struct ArchiveContentWritingState {
+//    QFile *archive;
+//    std::uint64_t contentOffset;
+//    QString dirAbsPath;
+//    ArchiverUtils::protobufStructs::PBArchiveMetaData metaArchive;
+//    ArchivePackingState(QFile *archive, std::uint64_t contentOffset, const QString & dirAbsPath)
+//        :archive(archive)
+//        ,contentOffset(contentOffset)
+//        ,dirAbsPath(dirAbsPath) {}
+//};
+
 struct ArchiveUnpackingState {
-    char* filesContent;
+    QFile *archive;
     QString dirAbsPath;
     ArchiverUtils::protobufStructs::PBArchiveMetaData* metaArchive;
     std::vector<DirTimeSetTask> dirsQueue;
-    ArchiveUnpackingState(char* filesContent, const QString & dirAbsPath, ArchiverUtils::protobufStructs::PBArchiveMetaData* metaArchive)
-        :filesContent(filesContent)
+    ArchiveUnpackingState(QFile *archive, const QString & dirAbsPath, ArchiverUtils::protobufStructs::PBArchiveMetaData* metaArchive)
+        :archive(archive)
         ,dirAbsPath(dirAbsPath)
         ,metaArchive(metaArchive) {}
 };

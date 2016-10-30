@@ -50,17 +50,12 @@ namespace details{
 }
 
 inline void pack_regfile_inode(const regular_file_inode *inode,
-        apb::PBDirEntMetaData *packed,
-        const QString pathToFile, char* filesContent, std::uint64_t & contentFreePosition)
+        apb::PBDirEntMetaData *packed, std::uint64_t & contentFreePosition)
 {
-    QFile file;
     details::pack_inode(&inode->inode, packed);
     packed->mutable_pbregfilemetadata()->set_contentsize(inode->inode.attrs.st_size);
     packed->mutable_pbregfilemetadata()->set_contentoffset(contentFreePosition);
 
-    file.setFileName(pathToFile);
-    file.open(QIODevice::ReadOnly);
-    memcpy(filesContent + contentFreePosition, file.readAll().data(), inode->inode.attrs.st_size);
     contentFreePosition += inode->inode.attrs.st_size;
 }
 
