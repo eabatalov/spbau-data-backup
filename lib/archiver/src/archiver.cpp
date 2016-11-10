@@ -28,7 +28,7 @@
 
 namespace apb = ArchiverUtils::protobufStructs;
 
-#define DEBUG_FLAG true
+#define DEBUG_FLAG false
 #define LOG(format, var) do{ \
     if (DEBUG_FLAG) fprintf(stderr, "line: %d.  " format, __LINE__ ,var); \
     }while(0)
@@ -64,8 +64,6 @@ void readOneFileFromArcive(QString path, std::uint64_t contentOffset, QFile * ar
 void writeContentToArchive(const QString & srcPath , const apb::PBArchiveMetaData & metaArchive, const std::uint64_t contentOffset, QFile * archive);
 void writeEmptyContent(QFile * file, std::uint64_t size);
 
-const static std::uint64_t MMAP_BUFFER_SIZE = 4096;
-
 ///////////////////////////////////////////
 ///////////////// PACK ////////////////////
 ///////////////////////////////////////////
@@ -99,7 +97,8 @@ void Archiver::pack(const QString &srcPath, const QString &dstArchiverPath) {
     if ((size_t)output.write(meta.get(), metaSize) < metaSize)
         throw Archiver::ArchiverException("Failed to write meta of " + srcPath);
 
-    writeEmptyContent(&output, archiveInfo.contentSize);
+    //writeEmptyContent(&output, archiveInfo.contentSize);
+    output.resize(ArchiverUtils::byteSizeOfNumber * 2 + metaSize + archiveInfo.contentSize);
 
     writeContentToArchive(aps.dirAbsPath, aps.metaArchive, ArchiverUtils::byteSizeOfNumber * 2 + metaSize, &output);
 
@@ -186,37 +185,30 @@ void writeOneFileToArcive(QString path, std::uint64_t contentOffset, QFile * arc
         throw Archiver::ArchiverException(QString("Cannot open file: ") + path);
     }
 
+    archive->size();
 
-    while (size > 0) {
-        std::uint64_t actualSize = std::min(MMAP_BUFFER_SIZE, size);
-
-        LOG("actualSize = %lld \n", actualSize);
-        LOG("file.size() = %lld \n", file.size());
-        LOG("contentOffset = %lld \n", contentOffset);
-        LOG("archive.size() = %lld \n", archive->size());
-
-
-        uchar* mmap = file.map(0, actualSize);
-        if (mmap == NULL) {
-            throw Archiver::ArchiverException(QString("Cannot mapped file: ") + path);
-        }
-        uchar* archiveMmap = archive->map(contentOffset, actualSize);
-        if (archiveMmap == NULL) {
-            throw Archiver::ArchiverException(QString("Cannot mapped archive with file: ") + path);
-        }
-
-        memmove(archiveMmap, mmap, actualSize);
-
-
-        if (!file.unmap(mmap)) {
-            throw Archiver::ArchiverException(QString("Cannot unmapped file: ") + path);
-        }
-        if (!archive->unmap(archiveMmap)) {
-            throw Archiver::ArchiverException(QString("Cannot unmapped archive with file: ") + path);
-        }
-        contentOffset += actualSize;
-        size -= actualSize;
+    if (size == 0) {
+        return;
     }
+
+    uchar* mmap = file.map(0, size);
+    if (mmap == NULL) {
+        throw Archiver::ArchiverException(QString("Cannot mapped file: ") + path);
+    }
+    uchar* archiveMmap = archive->map(contentOffset, size);
+    if (archiveMmap == NULL) {
+        throw Archiver::ArchiverException(QString("Cannot mapped archive with file: ") + path);
+    }
+
+    memcpy(archiveMmap, mmap, size);
+
+    if (!file.unmap(mmap)) {
+        throw Archiver::ArchiverException(QString("Cannot unmapped file: ") + path);
+    }
+    if (!archive->unmap(archiveMmap)) {
+        throw Archiver::ArchiverException(QString("Cannot unmapped archive with file: ") + path);
+    }
+
 }
 
 
@@ -279,9 +271,6 @@ void unpackRegfileFromArchive(AUS* aus, const apb::PBDirEntMetaData & curDirent,
         return ;
     }
 
-//    write(fileDescriptor, aus->filesContent + curDirent.pbregfilemetadata().contentoffset(),
-//          curDirent.pbregfilemetadata().contentsize());
-
     if (fchown(fileDescriptor, curDirent.uid(), curDirent.gid()))
         qCritical() << "Error in chowning " << path << '\n';
 
@@ -327,33 +316,30 @@ void readOneFileFromArcive(QString path, std::uint64_t contentOffset, QFile * ar
         throw Archiver::ArchiverException(QString("Cannot open file: ") + path);
     }
 
-    writeEmptyContent(&file, size);
-
-    while (size > 0) {
-        std::uint64_t actualSize = std::min(MMAP_BUFFER_SIZE, size);
-        LOG("actualSize = %lld \n", actualSize);
-        LOG("file.size() = %lld \n", file.size());
-        uchar* mmap = file.map(0, actualSize);
-        if (mmap == NULL) {
-            throw Archiver::ArchiverException(QString("Cannot mapped file: ") + path);
-        }
-        uchar* archiveMmap = archive->map(contentOffset, actualSize);
-        if (archiveMmap == NULL) {
-            throw Archiver::ArchiverException(QString("Cannot mapped archive with file: ") + path);
-        }
-
-        memmove(mmap, archiveMmap, actualSize);
-
-
-        if (!file.unmap(mmap)) {
-            throw Archiver::ArchiverException(QString("Cannot unmapped file: ") + path);
-        }
-        if (!archive->unmap(archiveMmap)) {
-            throw Archiver::ArchiverException(QString("Cannot unmapped archive with file: ") + path);
-        }
-        contentOffset += actualSize;
-        size -= actualSize;
+    file.resize(size);
+    file.size();
+    if (size == 0) {
+        return;
     }
+
+    uchar* mmap = file.map(0, size);
+    if (mmap == NULL) {
+        throw Archiver::ArchiverException(QString("Cannot mapped file: ") + path);
+    }
+    uchar* archiveMmap = archive->map(contentOffset, size);
+    if (archiveMmap == NULL) {
+        throw Archiver::ArchiverException(QString("Cannot mapped archive with file: ") + path);
+    }
+
+    memcpy(mmap, archiveMmap, size);
+
+    if (!file.unmap(mmap)) {
+        throw Archiver::ArchiverException(QString("Cannot unmapped file: ") + path);
+    }
+    if (!archive->unmap(archiveMmap)) {
+        throw Archiver::ArchiverException(QString("Cannot unmapped archive with file: ") + path);
+    }
+
 }
 
 ///////////////////////////////////////////

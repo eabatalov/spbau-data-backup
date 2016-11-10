@@ -26,15 +26,15 @@ int main(int argc, char *argv[]) {
 
     try {
         if (!strcmp("-p", argv[1])) {
-            qDebug() << QString("START PACKING: ") + argv[2] + " " + argv[3] + "\n";
+            qDebug() << QString("START PACKING: ") + argv[2] + " " + argv[3] << "\n";
             Archiver::pack(argv[2], argv[3]);
         } else
             if (!strcmp("-u", argv[1])) {
-                qDebug() << QString("START UNPACKING: ") + argv[2] + " " + argv[3] + "\n";
+                qDebug() << QString("START UNPACKING: ") + argv[2] + " " + argv[3] << "\n";
                 Archiver::unpack(argv[2], argv[3]);
             } else
                 if (!strcmp("-c", argv[1])) {
-                    qDebug() << QString("START CHECKING: ") + argv[2] + " " + argv[3] + "\n";
+                    qDebug() << QString("START CHECKING: ") + argv[2] + " " + argv[3] << "\n";
                     checkArchiver(argv[2], argv[3]);
                 } else {
                     std::cerr << "Unknown first argument in cmd!\nPlease print one of:\n\"-p sourcePath outputFileArchive\" to pack sourcePath to outputFileArchive" << std::endl <<
@@ -69,7 +69,7 @@ bool checkInode(inode* first, inode* second, const QString & dir1, const QString
         return false;
     }
 
-    if (first->attrs.st_atime != second->attrs.st_atime || first->attrs.st_mtime != second->attrs.st_mtime ||
+    if (/*first->attrs.st_atime != second->attrs.st_atime || */ first->attrs.st_mtime != second->attrs.st_mtime ||
             first->attrs.st_mode != second->attrs.st_mode || first->attrs.st_uid != second->attrs.st_uid ||
             first->attrs.st_gid != second->attrs.st_gid) {
         qCritical() << dir1 + name1 << ": different attrs" << '\n';
@@ -87,9 +87,14 @@ bool checkInode(inode* first, inode* second, const QString & dir1, const QString
         file1.open(QIODevice::ReadOnly);
         QFile file2(dir2 + name2);
         file2.open(QIODevice::ReadOnly);
-        QByteArray bytes1 = file1.readAll();
-        QByteArray bytes2 = file2.readAll();
-        if (memcmp(bytes1.data(), bytes2.data(), first->attrs.st_size)) {
+        uchar* mmap1 = file1.map(0, first->attrs.st_size);
+        uchar* mmap2 = file2.map(0, first->attrs.st_size);
+
+        if (mmap1 == NULL || mmap2 == NULL) {
+            qCritical() << dir1 + name1 << ": mapping error" << '\n';
+        }
+
+        if (memcmp(mmap1, mmap2, first->attrs.st_size)) {
             qCritical() << dir1 + name1 << ": different content" << '\n';
             return false;
         }
