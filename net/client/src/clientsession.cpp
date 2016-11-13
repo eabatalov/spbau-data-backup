@@ -38,6 +38,11 @@ void ClientSession::onConsoleInput(const std::string& message) {
         return;
     }
 
+    if (mClientState == WAIT_LOGIN_INPUT) {
+        sendLoginRequest(message);
+        return;
+    }
+
     if (mClientState != WAIT_USER_INPUT) {
         emit sigWriteToConsole("Busy. Try later.");
         return;
@@ -71,6 +76,9 @@ void ClientSession::onConsoleInput(const std::string& message) {
 void ClientSession::onNetworkInput(const QByteArray &message) {
     utils::commandType cmd = *((utils::commandType*)message.data());
     switch (cmd) {
+    case utils::ansToClientLogin:
+        OnLoginAns(message.data()+utils::commandSize, message.size()-utils::commandSize);
+        break;
     case utils::ansToLsSummary:
         OnSummaryLs(message.data()+utils::commandSize, message.size()-utils::commandSize);
         break;
@@ -100,12 +108,25 @@ void ClientSession::onNetworkInput(const QByteArray &message) {
 
 void ClientSession::onStart() {
     if (mClientState == NOT_STARTED) {
-        mClientState = WAIT_USER_INPUT;
-        emit sigWriteToConsole("Print command or \"exit\" to close app:");
+        mClientState = WAIT_LOGIN_INPUT;
+        emit sigWriteToConsole("Print login:");
     } else {
         mClientState = ABORTED;
         std::cerr << "Error, connecting after connected..." << std::endl;
     }
+}
+
+void ClientSession::sendLoginRequest(const std::string& login) {
+    networkUtils::protobufStructs::LoginClientRequest loginRequest;
+    loginRequest.set_login(login);
+
+    std::string serializatedLoginRequest;
+    if (!loginRequest.SerializeToString(&serializatedLoginRequest)) {
+        std::cerr << "Error with serialization login request cmd." << std::endl;
+        return;
+    }
+    sendSerializatedMessage(serializatedLoginRequest, utils::clientLogin, loginRequest.ByteSize());
+    mClientState = WAIT_LOGIN_STATUS;
 }
 
 void ClientSession::sendLsFromClient(networkUtils::protobufStructs::LsClientRequest ls) {
@@ -215,6 +236,24 @@ std::string inttostr(std::uint64_t number) {
         number /= 10;
     }
     return S;
+}
+
+void ClientSession::OnLoginAns(const char *buffer, uint64_t bufferSize) {
+    if (mClientState != WAIT_LOGIN_STATUS) {
+        std::cerr << "Unexpected LoginAns" << std::endl;
+        mClientState = ABORTED;
+        return;
+    }
+
+    networkUtils::protobufStructs::LoginServerAnswer serverAnswer;
+    serverAnswer.ParseFromArray(buffer, bufferSize);
+    if (serverAnswer.issuccess()) {
+        mClientState = WAIT_USER_INPUT;
+        emit sigWriteToConsole("Login was success. Print command or \"exit\" to close app:");
+    } else {
+        mClientState = WAIT_LOGIN_INPUT;
+        emit sigWriteToConsole("Login was unsuccess. Print login:");
+    }
 }
 
 std::string shortBackupInfoToString(const networkUtils::protobufStructs::ShortBackupInfo& backupInfo) {

@@ -1,14 +1,16 @@
 #include "serverclientmanager.h"
 #include "clientsessiononserver.h"
+#include "clientsessiononservercreator.h"
 #include <iostream>
+#include <QThread>
 
 ServerClientManager::ServerClientManager(size_t maxClientNumber, QHostAddress adress, quint16 port, QObject *parent)
     : QObject(parent)
     , mMaxClientNumber(maxClientNumber) {
-    mClients = new ClientSessionOnServer*[mMaxClientNumber];
+    //mClients = new ClientSessionOnServer*[mMaxClientNumber];
     used = new bool[mMaxClientNumber];
     for (size_t i = 0; i < mMaxClientNumber; ++i) {
-        mClients[i] = NULL;
+    //    mClients[i] = NULL;
         used[i] = false;
     }
     mTcpServer = new QTcpServer(this);
@@ -23,10 +25,10 @@ ServerClientManager::ServerClientManager(size_t maxClientNumber, QHostAddress ad
 }
 
 ServerClientManager::~ServerClientManager() {
-    delete[] mClients;
+    //delete[] mClients;
     delete[] used;
     mTcpServer->deleteLater();
-    mClients = NULL;
+    //mClients = NULL;
     used = NULL;
     google::protobuf::ShutdownProtobufLibrary();
 }
@@ -36,6 +38,7 @@ bool ServerClientManager::clientExist(size_t clientNumber) {
 }
 
 void ServerClientManager::onNewConnection() {
+    //TODO: fix it
     QTcpSocket* newClient = mTcpServer->nextPendingConnection();
     bool canAdd = false;
     size_t clientNumber = 0;
@@ -52,13 +55,26 @@ void ServerClientManager::onNewConnection() {
     }
 
     used[clientNumber] = true;
-    ClientSessionOnServer* perClient = new ClientSessionOnServer(clientNumber, newClient, this);
-    connect(perClient, &ClientSessionOnServer::releaseClientPlace, this, &ServerClientManager::releaseClientPlace);
-    mClients[clientNumber] = perClient;
+
+
+    ClientSessionOnServerCreator* clientSessionOnServerCreator = new ClientSessionOnServerCreator();
+    clientSessionOnServerCreator->init(newClient, this, clientNumber);
+    QThread* thread = new QThread();
+    clientSessionOnServerCreator->moveToThread(thread);
+    newClient->setParent(NULL);
+    newClient->moveToThread(thread);
+
+    connect(thread, &QThread::started, clientSessionOnServerCreator, &ClientSessionOnServerCreator::process);
+    connect(clientSessionOnServerCreator, &ClientSessionOnServerCreator::destroyed, thread, &QThread::quit);
+    connect(thread, SIGNAL(finished()), thread, SLOT(deleteLater()));
+
+    thread->start();
+
+    //mClients[clientNumber] = perClient;
 }
 
-void ServerClientManager::releaseClientPlace(size_t clientNumber) {
-    mClients[clientNumber] = NULL;
+void ServerClientManager::releaseClientPlace(std::uint64_t clientNumber) {
+    //mClients[clientNumber] = NULL;
     used[clientNumber] = false;
 }
 

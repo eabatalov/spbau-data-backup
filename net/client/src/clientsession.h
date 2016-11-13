@@ -24,6 +24,8 @@ private:
     ConsoleStream* mConsoleStream;
     enum ClientState {
         NOT_STARTED,
+        WAIT_LOGIN_INPUT,
+        WAIT_LOGIN_STATUS,
         WAIT_USER_INPUT,
         WAIT_LS_RESULT,
         WAIT_RESTORE_RESULT,
@@ -33,6 +35,7 @@ private:
     } mClientState;
 
     //SendNetMessage:
+    void sendLoginRequest(const std::string & login);
     void askLs();
     void askLs(const std::string& command);
     void makeRestoreRequest(const std::string& command);
@@ -42,6 +45,7 @@ private:
     void sendSerializatedMessage(const std::string& binaryMessage, utils::commandType cmdType, int messageSize);
 
     //ReceiveNetMessage:
+    void OnLoginAns(const char *buffer, uint64_t bufferSize);
     void OnDetailedLs(const char *buffer, uint64_t bufferSize);
     void OnSummaryLs(const char *buffer, uint64_t bufferSize);
     void OnReceiveArchiveToRestore(const char *buffer, uint64_t bufferSize);

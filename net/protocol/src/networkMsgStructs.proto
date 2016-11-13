@@ -1,5 +1,13 @@
 package networkUtils.protobufStructs;
 
+message LoginClientRequest {
+	required string login = 1;
+}
+
+message LoginServerAnswer {
+	required bool isSuccess = 1;
+}
+
 message LsClientRequest {
 	optional uint64 backupId = 1;
 	required bool isLS = 2;

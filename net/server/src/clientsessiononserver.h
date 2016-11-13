@@ -16,7 +16,7 @@ public:
     ClientSessionOnServer(size_t clientNumber, QTcpSocket *clientSocket, QObject* parent = 0);
 
 private:
-    size_t mClientNumber;
+    std::uint64_t mClientNumber;
     QString mLogin;
     NetworkStream* mNetworkStream;
     serverUtils::protobufStructs::VectorOfServerMetadataForArchive mMetadatas;
@@ -30,6 +30,7 @@ private:
     } mPerClientState;
 
     bool isValidBackupId(std::uint64_t backupId);
+    void onLoginRequest(const char* buffer, std::uint64_t bufferSize);
     void onLsRequest(const char* buffer, std::uint64_t bufferSize);
     void onRestoreRequest(const char* bufferbuffer, std::uint64_t bufferSize);
     void onReplyAfterRestore(const char* bufferbuffer, std::uint64_t bufferSize);
@@ -42,7 +43,7 @@ private:
     void sendServerExit(QString message);
 
 signals:
-    void releaseClientPlace(size_t clientNumber);
+    void releaseClientPlace(std::uint64_t clientNumber);
     void sigSendClientMessage(const QByteArray & message);
 
 private slots:

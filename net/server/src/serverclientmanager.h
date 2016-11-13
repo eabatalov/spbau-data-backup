@@ -15,11 +15,12 @@ public:
     ~ServerClientManager();
 
 public slots:
+    void releaseClientPlace(std::uint64_t clientNumber);
 
 private:
     QTcpServer* mTcpServer;
     size_t mMaxClientNumber;
-    ClientSessionOnServer** mClients;
+    //ClientSessionOnServer** mClients;
     bool* used;
     bool clientExist(size_t clientNumber);
 
@@ -27,7 +28,7 @@ signals:
 
 private slots:
     void onNewConnection();
-    void releaseClientPlace(size_t clientNumber);
+
 };
 
 #endif // SERVERNETWORKSTREAM_H

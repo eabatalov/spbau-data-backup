@@ -11,6 +11,7 @@ namespace utils{
     typedef uint8_t commandType;
 
     enum ClientCommandId{
+        clientLogin,
         ls,
         restore,
         replyAfterRestore,
@@ -19,6 +20,7 @@ namespace utils{
     };
 
     enum ServerCommandId{
+        ansToClientLogin,
         ansToLsSummary,
         ansToLsDetailed,
         ansToRestore,
@@ -32,7 +34,7 @@ namespace utils{
         return cmd;
     }
 
-    inline uint8_t toFixedType(ServerCommandId cmd){
+    inline commandType toFixedType(ServerCommandId cmd){
         return cmd;
     }
 }

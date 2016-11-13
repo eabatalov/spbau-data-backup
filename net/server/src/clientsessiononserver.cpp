@@ -22,35 +22,20 @@ ClientSessionOnServer::ClientSessionOnServer(size_t clientNumber, QTcpSocket* cl
     :QObject(parent)
     ,mClientNumber(clientNumber)
     ,newBackupId(0)
-    ,mPerClientState(NOT_AUTORIZATED) {
+    ,mPerClientState(NOT_AUTORIZATED){
     mNetworkStream = new NetworkStream(clientSocket, this);
     connect(mNetworkStream, &NetworkStream::newNetMessage, this, &ClientSessionOnServer::onNetworkInput);
     connect(this, &ClientSessionOnServer::sigSendClientMessage, mNetworkStream, &NetworkStream::sendNetMessage);
     connect(clientSocket, &QTcpSocket::disconnected, this, &ClientSessionOnServer::disconnectSocket);
-
-    //TODO: Fix it (add authorization)
-    mPerClientState = NORMAL;
-    mLogin = "example";
-
-    std::string mLoginStdString = mLogin.toStdString();
-    std::fstream metadatasFile("users/" + mLoginStdString + ".usermetas", std::ios::in | std::ios::binary);
-
-    if (metadatasFile.is_open()) {
-        if (!mMetadatas.ParseFromIstream(&metadatasFile)) {
-              std::cerr << "Failed to read metas info." << std::endl;
-        }
-        newBackupId = mMetadatas.metadatas_size();
-    } else {
-        std::fstream newMetadatasFile("users/" + mLoginStdString + std::string(".usermetas"), std::ios::out | std::ios::trunc | std::ios::binary);
-        if (!mMetadatas.SerializeToOstream(&newMetadatasFile)) {
-              std::cerr << "Failed to create metas info file." << std::endl;
-        }
-    }
 }
+
 
 void ClientSessionOnServer::onNetworkInput(const QByteArray &message) {
     utils::commandType cmd = *((utils::commandType*)message.data());
     switch (cmd) {
+    case utils::clientLogin:
+        onLoginRequest(message.data()+utils::commandSize, message.size()-utils::commandSize);
+        break;
     case utils::ls:
         onLsRequest(message.data()+utils::commandSize, message.size()-utils::commandSize);
         break;
@@ -70,6 +55,48 @@ void ClientSessionOnServer::onNetworkInput(const QByteArray &message) {
         std::cerr << "Unsupported command from client." << std::endl;
     }
 
+}
+
+void ClientSessionOnServer::onLoginRequest(const char* buffer, std::uint64_t bufferSize) {
+    if (mPerClientState != NOT_AUTORIZATED) {
+        std::cerr << "Error with curstate. Unexpected LoginRequest" << std::endl;
+        sendServerExit("Oooops. Server exit because of error with curstate. Unexpected LoginRequest.");
+        mPerClientState = ABORTED;
+        disconnectSocket();
+    }
+
+    networkUtils::protobufStructs::LoginClientRequest loginRequest;
+    loginRequest.ParseFromArray(buffer, bufferSize);
+    mPerClientState = NORMAL;
+    mLogin = QString::fromStdString(loginRequest.login());
+
+    std::cout << "connected user: " << loginRequest.login() << std::endl;
+
+    std::string mLoginStdString = mLogin.toStdString();
+    std::fstream metadatasFile("users/" + mLoginStdString + ".usermetas", std::ios::in | std::ios::binary);
+
+    if (metadatasFile.is_open()) {
+        if (!mMetadatas.ParseFromIstream(&metadatasFile)) {
+              std::cerr << "Failed to read metas info." << std::endl;
+        }
+        newBackupId = mMetadatas.metadatas_size();
+    } else {
+        std::fstream newMetadatasFile("users/" + mLoginStdString + std::string(".usermetas"), std::ios::out | std::ios::trunc | std::ios::binary);
+        if (!mMetadatas.SerializeToOstream(&newMetadatasFile)) {
+              std::cerr << "Failed to create metas info file." << std::endl;
+        }
+    }
+
+    networkUtils::protobufStructs::LoginServerAnswer serverAnswer;
+    serverAnswer.set_issuccess(true);
+
+    std::string serializated;
+    if (!serverAnswer.SerializeToString(&serializated)) {
+        std::cerr << "Error with serialization LSDetailed." << std::endl;
+        sendServerError("Ooops... Error with serialization LoginServerAnswer.");
+        return;
+    }
+    sendSerializatedMessage(serializated, utils::ansToClientLogin, serverAnswer.ByteSize());
 }
 
 void ClientSessionOnServer::onLsRequest(const char *buffer, uint64_t bufferSize) {
@@ -99,7 +126,7 @@ void ClientSessionOnServer::onLsRequest(const char *buffer, uint64_t bufferSize)
                 sendServerError("Ooops...");
             } else {
                 lsDetailed.set_meta(metaInQByteArray.data(), metaInQByteArray.size());
-                networkUtils::protobufStructs::ShortBackupInfo* backupInfo = new networkUtils::protobufStructs::ShortBackupInfo;
+                networkUtils::protobufStructs::ShortBackupInfo* backupInfo = new networkUtils::protobufStructs::ShortBackupInfo();
                 backupInfo->set_backupid(mMetadatas.metadatas(lsRequest.backupid()).id());
                 backupInfo->set_path(mMetadatas.metadatas(lsRequest.backupid()).origianlpath());
                 backupInfo->set_time(mMetadatas.metadatas(lsRequest.backupid()).creationtime());
