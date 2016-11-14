@@ -12,6 +12,7 @@ class ClientSession : public QObject {
 public:
     explicit ClientSession(NetworkStream* networkStream, ConsoleStream* consoleStream, QObject *parent = 0);
     ~ClientSession() {
+        // TODO move protobuf lib deinitialization to the end of main
         google::protobuf::ShutdownProtobufLibrary();
     }
 
@@ -20,6 +21,7 @@ signals:
     void sigWriteToNetwork(const QByteArray & message);
 
 private:
+    // XXX We don't need those pointers because we use signals
     NetworkStream* mNetworkStream;
     ConsoleStream* mConsoleStream;
     enum ClientState {
@@ -45,6 +47,7 @@ private:
     void sendSerializatedMessage(const std::string& binaryMessage, utils::commandType cmdType, int messageSize);
 
     //ReceiveNetMessage:
+    // XXX let's rename non-slot functions to somethings like procLoginAns
     void OnLoginAns(const char *buffer, uint64_t bufferSize);
     void OnDetailedLs(const char *buffer, uint64_t bufferSize);
     void OnSummaryLs(const char *buffer, uint64_t bufferSize);

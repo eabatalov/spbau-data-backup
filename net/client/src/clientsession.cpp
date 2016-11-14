@@ -149,6 +149,7 @@ void ClientSession::askLs(const std::string& command) {
     networkUtils::protobufStructs::LsClientRequest ls;
     ls.set_isls(1);
     std::uint64_t backupId = 0;
+    // XXX sscanf
     for (size_t i = 0; i < command.size(); ++i) {
         if (command[i] >= '0' && command[i] <= '9') {
             backupId = 10 * backupId + (command[i]-'0');
@@ -165,6 +166,7 @@ void ClientSession::makeRestoreRequest(const std::string& command) {
     networkUtils::protobufStructs::RestoreClientRequest restoreRequest;
     std::uint64_t backupId = 0;
     size_t i = 0;
+    // XXX sscanf
     for (i = 0; i < command.size(); ++i) {
         if (command[i] >= '0' && command[i] <= '9') {
             backupId = 10 * backupId + (command[i]-'0');
@@ -227,6 +229,7 @@ void ClientSession::sendRestoreResult(bool restoreResult) {
     LOG("Send replyAfterRestore. Size = %d\n", reply.ByteSize());
 }
 
+// XXX sprintf
 std::string inttostr(std::uint64_t number) {
     if (number == 0)
         return "0";

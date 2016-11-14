@@ -30,6 +30,7 @@ private:
     } mPerClientState;
 
     bool isValidBackupId(std::uint64_t backupId);
+    // XXX rename to procLoginRequest
     void onLoginRequest(const char* buffer, std::uint64_t bufferSize);
     void onLsRequest(const char* buffer, std::uint64_t bufferSize);
     void onRestoreRequest(const char* bufferbuffer, std::uint64_t bufferSize);

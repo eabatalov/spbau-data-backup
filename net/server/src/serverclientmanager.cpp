@@ -8,6 +8,7 @@ ServerClientManager::ServerClientManager(size_t maxClientNumber, QHostAddress ad
     : QObject(parent)
     , mMaxClientNumber(maxClientNumber) {
     //mClients = new ClientSessionOnServer*[mMaxClientNumber];
+    // XXX there is a class called std::vector for this :)
     used = new bool[mMaxClientNumber];
     for (size_t i = 0; i < mMaxClientNumber; ++i) {
     //    mClients[i] = NULL;
