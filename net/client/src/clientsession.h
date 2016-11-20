@@ -21,9 +21,6 @@ signals:
     void sigWriteToNetwork(const QByteArray & message);
 
 private:
-    // XXX We don't need those pointers because we use signals
-    NetworkStream* mNetworkStream;
-    ConsoleStream* mConsoleStream;
     enum ClientState {
         NOT_STARTED,
         WAIT_LOGIN_INPUT,
@@ -47,15 +44,14 @@ private:
     void sendSerializatedMessage(const std::string& binaryMessage, utils::commandType cmdType, int messageSize);
 
     //ReceiveNetMessage:
-    // XXX let's rename non-slot functions to somethings like procLoginAns
-    void OnLoginAns(const char *buffer, uint64_t bufferSize);
-    void OnDetailedLs(const char *buffer, uint64_t bufferSize);
-    void OnSummaryLs(const char *buffer, uint64_t bufferSize);
-    void OnReceiveArchiveToRestore(const char *buffer, uint64_t bufferSize);
-    void OnReceiveBackupResults(const char *buffer, uint64_t bufferSize);
-    void OnServerError(const char *buffer, uint64_t bufferSize);
-    void OnNotFoundBackupId(const char *buffer, uint64_t bufferSize);
-    void OnServerExit(const char *buffer, uint64_t bufferSize);
+    void procLoginAns(const char *buffer, uint64_t bufferSize);
+    void procDetailedLs(const char *buffer, uint64_t bufferSize);
+    void procSummaryLs(const char *buffer, uint64_t bufferSize);
+    void procReceiveArchiveToRestore(const char *buffer, uint64_t bufferSize);
+    void procReceiveBackupResults(const char *buffer, uint64_t bufferSize);
+    void procServerError(const char *buffer, uint64_t bufferSize);
+    void procNotFoundBackupId(const char *buffer, uint64_t bufferSize);
+    void procServerExit(const char *buffer, uint64_t bufferSize);
 
 
     std::string restorePath;

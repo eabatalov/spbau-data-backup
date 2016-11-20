@@ -30,13 +30,12 @@ private:
     } mPerClientState;
 
     bool isValidBackupId(std::uint64_t backupId);
-    // XXX rename to procLoginRequest
-    void onLoginRequest(const char* buffer, std::uint64_t bufferSize);
-    void onLsRequest(const char* buffer, std::uint64_t bufferSize);
-    void onRestoreRequest(const char* bufferbuffer, std::uint64_t bufferSize);
-    void onReplyAfterRestore(const char* bufferbuffer, std::uint64_t bufferSize);
-    void onBackupRequest(const char* bufferbuffer, std::uint64_t bufferSize);
-    void onclientExit();
+    void procLoginRequest(const char* buffer, std::uint64_t bufferSize);
+    void procLsRequest(const char* buffer, std::uint64_t bufferSize);
+    void procRestoreRequest(const char* bufferbuffer, std::uint64_t bufferSize);
+    void procReplyAfterRestore(const char* bufferbuffer, std::uint64_t bufferSize);
+    void procBackupRequest(const char* bufferbuffer, std::uint64_t bufferSize);
+    void procClientExit();
     void sendSerializatedMessage(const std::string& binaryMessage, utils::commandType cmdType, int messageSize);
     bool saveStateMetadatas();
     void sendNotFoundBackupIdToClient(std::uint64_t backupId);

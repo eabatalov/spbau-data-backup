@@ -8,11 +8,9 @@ ServerClientManager::ServerClientManager(size_t maxClientNumber, QHostAddress ad
     : QObject(parent)
     , mMaxClientNumber(maxClientNumber) {
     //mClients = new ClientSessionOnServer*[mMaxClientNumber];
-    // XXX there is a class called std::vector for this :)
-    used = new bool[mMaxClientNumber];
+    used = std::vector<bool>(mMaxClientNumber, false);
     for (size_t i = 0; i < mMaxClientNumber; ++i) {
     //    mClients[i] = NULL;
-        used[i] = false;
     }
     mTcpServer = new QTcpServer(this);
     if (!mTcpServer->listen(adress, port)) {
@@ -27,10 +25,8 @@ ServerClientManager::ServerClientManager(size_t maxClientNumber, QHostAddress ad
 
 ServerClientManager::~ServerClientManager() {
     //delete[] mClients;
-    delete[] used;
     mTcpServer->deleteLater();
     //mClients = NULL;
-    used = NULL;
     google::protobuf::ShutdownProtobufLibrary();
 }
 

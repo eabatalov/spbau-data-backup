@@ -17,7 +17,7 @@ void ClientSessionOnServerCreator::init(QTcpSocket * socket, ServerClientManager
 }
 
 ClientSessionOnServerCreator::~ClientSessionOnServerCreator() {
-    delete clientSession;
+    //delete clientSession;
     delete mSocket;
 }
 

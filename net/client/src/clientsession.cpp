@@ -20,16 +20,14 @@
 
 ClientSession::ClientSession(NetworkStream* networkStream, ConsoleStream* consoleStream, QObject *parent)
     :QObject(parent)
-    ,mNetworkStream(networkStream)
-    ,mConsoleStream(consoleStream)
     ,mClientState(NOT_STARTED) {
     consoleStream->setParent(this);
     networkStream->setParent(this);
-    connect(mConsoleStream, &ConsoleStream::readln, this, &ClientSession::onConsoleInput);
-    connect(this, &ClientSession::sigWriteToConsole, mConsoleStream, &ConsoleStream::println);
-    connect(mNetworkStream,  &NetworkStream::newNetMessage, this, &ClientSession::onNetworkInput);
-    connect(this, &ClientSession::sigWriteToNetwork, mNetworkStream, &NetworkStream::sendNetMessage);
-    connect(mNetworkStream, &NetworkStream::connected, this, &ClientSession::onStart);
+    connect(consoleStream, &ConsoleStream::readln, this, &ClientSession::onConsoleInput);
+    connect(this, &ClientSession::sigWriteToConsole, consoleStream, &ConsoleStream::println);
+    connect(networkStream,  &NetworkStream::newNetMessage, this, &ClientSession::onNetworkInput);
+    connect(this, &ClientSession::sigWriteToNetwork, networkStream, &NetworkStream::sendNetMessage);
+    connect(networkStream, &NetworkStream::connected, this, &ClientSession::onStart);
 }
 
 void ClientSession::onConsoleInput(const std::string& message) {
@@ -77,28 +75,28 @@ void ClientSession::onNetworkInput(const QByteArray &message) {
     utils::commandType cmd = *((utils::commandType*)message.data());
     switch (cmd) {
     case utils::ansToClientLogin:
-        OnLoginAns(message.data()+utils::commandSize, message.size()-utils::commandSize);
+        procLoginAns(message.data()+utils::commandSize, message.size()-utils::commandSize);
         break;
     case utils::ansToLsSummary:
-        OnSummaryLs(message.data()+utils::commandSize, message.size()-utils::commandSize);
+        procSummaryLs(message.data()+utils::commandSize, message.size()-utils::commandSize);
         break;
     case utils::ansToLsDetailed:
-        OnDetailedLs(message.data()+utils::commandSize, message.size()-utils::commandSize);
+        procDetailedLs(message.data()+utils::commandSize, message.size()-utils::commandSize);
         break;
     case utils::ansToBackup:
-        OnReceiveBackupResults(message.data()+utils::commandSize, message.size()-utils::commandSize);
+        procReceiveBackupResults(message.data()+utils::commandSize, message.size()-utils::commandSize);
         break;
     case utils::ansToRestore:
-        OnReceiveArchiveToRestore(message.data()+utils::commandSize, message.size()-utils::commandSize);
+        procReceiveArchiveToRestore(message.data()+utils::commandSize, message.size()-utils::commandSize);
         break;
     case utils::serverExit:
-        OnServerError(message.data()+utils::commandSize, message.size()-utils::commandSize);
+        procServerError(message.data()+utils::commandSize, message.size()-utils::commandSize);
         break;
     case utils::notFoundBackupByIdOnServer:
-        OnNotFoundBackupId(message.data()+utils::commandSize, message.size()-utils::commandSize);
+        procNotFoundBackupId(message.data()+utils::commandSize, message.size()-utils::commandSize);
         break;
     case utils::serverError:
-        OnServerExit(message.data()+utils::commandSize, message.size()-utils::commandSize);
+        procServerExit(message.data()+utils::commandSize, message.size()-utils::commandSize);
         break;
     default:
         std::cerr << "Unsupported command from server." << std::endl;
@@ -148,15 +146,7 @@ void ClientSession::askLs() {
 void ClientSession::askLs(const std::string& command) {
     networkUtils::protobufStructs::LsClientRequest ls;
     ls.set_isls(1);
-    std::uint64_t backupId = 0;
-    // XXX sscanf
-    for (size_t i = 0; i < command.size(); ++i) {
-        if (command[i] >= '0' && command[i] <= '9') {
-            backupId = 10 * backupId + (command[i]-'0');
-        }
-        else
-            break;
-    }
+    std::uint64_t backupId = std::stoull(command);
     ls.set_backupid(backupId);
     sendLsFromClient(ls);
     mClientState = WAIT_LS_RESULT;
@@ -164,25 +154,17 @@ void ClientSession::askLs(const std::string& command) {
 
 void ClientSession::makeRestoreRequest(const std::string& command) {
     networkUtils::protobufStructs::RestoreClientRequest restoreRequest;
-    std::uint64_t backupId = 0;
-    size_t i = 0;
-    // XXX sscanf
-    for (i = 0; i < command.size(); ++i) {
-        if (command[i] >= '0' && command[i] <= '9') {
-            backupId = 10 * backupId + (command[i]-'0');
-        }
-        else
-            break;
-    }
-    ++i;
+    size_t indexAfterNumber = 0;
+    std::uint64_t backupId = std::stoull(command, &indexAfterNumber);
+    ++indexAfterNumber;
     restoreRequest.set_backupid(backupId);
 
-    if (i >= command.size()) {
+    if (indexAfterNumber >= command.size()) {
         std::cerr << "Missing path in restore request" << std::endl;
         return;
     }
 
-    restorePath = command.substr(i);
+    restorePath = command.substr(indexAfterNumber);
 
     std::string serializatedRestoreRequest;
     if (!restoreRequest.SerializeToString(&serializatedRestoreRequest)) {
@@ -229,19 +211,16 @@ void ClientSession::sendRestoreResult(bool restoreResult) {
     LOG("Send replyAfterRestore. Size = %d\n", reply.ByteSize());
 }
 
-// XXX sprintf
-std::string inttostr(std::uint64_t number) {
-    if (number == 0)
-        return "0";
-    std::string S = "";
-    while (number > 0) {
-        S = std::string(1, '0'+(char)(number % 10)) + S;
-        number /= 10;
-    }
-    return S;
-}
+//// XXX sprintf
+//std::string inttostr(std::uint64_t number) {
+//    const int maxIntSize = 50;
+//    std::vector<char> buf(maxIntSize);
+//    int actualSize = sprintf(buf.data(), "%lud", number);
+//    std::string ans = std::string(buf.data(), actualSize);
+//    return ans;
+//}
 
-void ClientSession::OnLoginAns(const char *buffer, uint64_t bufferSize) {
+void ClientSession::procLoginAns(const char *buffer, uint64_t bufferSize) {
     if (mClientState != WAIT_LOGIN_STATUS) {
         std::cerr << "Unexpected LoginAns" << std::endl;
         mClientState = ABORTED;
@@ -261,10 +240,10 @@ void ClientSession::OnLoginAns(const char *buffer, uint64_t bufferSize) {
 
 std::string shortBackupInfoToString(const networkUtils::protobufStructs::ShortBackupInfo& backupInfo) {
     time_t time = (time_t)backupInfo.time();
-    return inttostr(backupInfo.backupid()) + " " + backupInfo.path() + " " + ctime(&time);
+    return std::to_string(backupInfo.backupid()) + " " + backupInfo.path() + " " + ctime(&time);
 }
 
-void ClientSession::OnDetailedLs(const char *buffer, uint64_t bufferSize) {
+void ClientSession::procDetailedLs(const char *buffer, uint64_t bufferSize) {
     if (mClientState != WAIT_LS_RESULT) {
         std::cerr << "Unexpected DETAILED_LS_RESULT" << std::endl;
         mClientState = ABORTED;
@@ -293,7 +272,7 @@ void ClientSession::OnDetailedLs(const char *buffer, uint64_t bufferSize) {
     mClientState = WAIT_USER_INPUT;
 }
 
-void ClientSession::OnSummaryLs(const char *buffer, uint64_t bufferSize) {
+void ClientSession::procSummaryLs(const char *buffer, uint64_t bufferSize) {
     if (mClientState != WAIT_LS_RESULT) {
         std::cerr << "Unexpected SUMMURY_LS_RESULT" << std::endl;
         mClientState = ABORTED;
@@ -307,12 +286,12 @@ void ClientSession::OnSummaryLs(const char *buffer, uint64_t bufferSize) {
     for (int i = 0; i < lsSummary.shortbackupinfo_size(); ++i) {
         ans += shortBackupInfoToString(lsSummary.shortbackupinfo(i));
     }
-    ans += inttostr(lsSummary.shortbackupinfo_size()) + " backups.";
+    ans += std::to_string(lsSummary.shortbackupinfo_size()) + " backups.";
     emit sigWriteToConsole(ans);
     mClientState = WAIT_USER_INPUT;
 }
 
-void ClientSession::OnReceiveArchiveToRestore(const char *buffer, uint64_t bufferSize) {
+void ClientSession::procReceiveArchiveToRestore(const char *buffer, uint64_t bufferSize) {
     if (mClientState != WAIT_RESTORE_RESULT) {
         std::cerr << "Unexpected RESTORE_RESULT" << std::endl;
         mClientState = ABORTED;
@@ -348,7 +327,7 @@ void ClientSession::OnReceiveArchiveToRestore(const char *buffer, uint64_t buffe
     mClientState = WAIT_USER_INPUT;
 }
 
-void ClientSession::OnNotFoundBackupId(const char *buffer, uint64_t bufferSize) {
+void ClientSession::procNotFoundBackupId(const char *buffer, uint64_t bufferSize) {
     networkUtils::protobufStructs::ServerError serverError;
     serverError.ParseFromArray(buffer, bufferSize);
 
@@ -358,7 +337,7 @@ void ClientSession::OnNotFoundBackupId(const char *buffer, uint64_t bufferSize) 
 }
 
 
-void ClientSession::OnReceiveBackupResults(const char *buffer, uint64_t bufferSize) {
+void ClientSession::procReceiveBackupResults(const char *buffer, uint64_t bufferSize) {
     if (mClientState != WAIT_BACKUP_RESULT) {
         std::cerr << "Unexpected BACKUP_RESULT" << std::endl;
         mClientState = ABORTED;
@@ -368,21 +347,21 @@ void ClientSession::OnReceiveBackupResults(const char *buffer, uint64_t bufferSi
     networkUtils::protobufStructs::ServerBackupResult backupResult;
     backupResult.ParseFromArray(buffer, bufferSize);
     if (backupResult.issuccess()) {
-        emit sigWriteToConsole("Backup was succed. BackupId = " + inttostr(backupResult.backupid()));
+        emit sigWriteToConsole("Backup was succed. BackupId = " + std::to_string(backupResult.backupid()));
     } else {
         emit sigWriteToConsole("Backup wasn't succed.");
     }
     mClientState = WAIT_USER_INPUT;
 }
 
-void ClientSession::OnServerError(const char *buffer, uint64_t bufferSize) {
+void ClientSession::procServerError(const char *buffer, uint64_t bufferSize) {
     networkUtils::protobufStructs::ServerError serverError;
     serverError.ParseFromArray(buffer, bufferSize);
     emit sigWriteToConsole("Server error: " + serverError.errormessage());
     mClientState = WAIT_USER_INPUT;
 }
 
-void ClientSession::OnServerExit(const char *buffer, uint64_t bufferSize) {
+void ClientSession::procServerExit(const char *buffer, uint64_t bufferSize) {
     networkUtils::protobufStructs::ServerError serverError;
     serverError.ParseFromArray(buffer, bufferSize);
     emit sigWriteToConsole("Server error: " + serverError.errormessage() + "\nState is aborted.");

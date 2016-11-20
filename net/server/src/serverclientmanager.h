@@ -6,6 +6,8 @@
 #include <QTcpSocket>
 #include <QDataStream>
 #include <QHostAddress>
+
+#include <vector>
 #include "clientsessiononserver.h"
 
 class ServerClientManager : public QObject {
@@ -21,7 +23,7 @@ private:
     QTcpServer* mTcpServer;
     size_t mMaxClientNumber;
     //ClientSessionOnServer** mClients;
-    bool* used;
+    std::vector<bool> used;
     bool clientExist(size_t clientNumber);
 
 signals:

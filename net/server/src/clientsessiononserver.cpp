@@ -34,22 +34,22 @@ void ClientSessionOnServer::onNetworkInput(const QByteArray &message) {
     utils::commandType cmd = *((utils::commandType*)message.data());
     switch (cmd) {
     case utils::clientLogin:
-        onLoginRequest(message.data()+utils::commandSize, message.size()-utils::commandSize);
+        procLoginRequest(message.data()+utils::commandSize, message.size()-utils::commandSize);
         break;
     case utils::ls:
-        onLsRequest(message.data()+utils::commandSize, message.size()-utils::commandSize);
+        procLsRequest(message.data()+utils::commandSize, message.size()-utils::commandSize);
         break;
     case utils::restore:
-        onRestoreRequest(message.data()+utils::commandSize, message.size()-utils::commandSize);
+        procRestoreRequest(message.data()+utils::commandSize, message.size()-utils::commandSize);
         break;
     case utils::replyAfterRestore:
-        onReplyAfterRestore(message.data()+utils::commandSize, message.size()-utils::commandSize);
+        procReplyAfterRestore(message.data()+utils::commandSize, message.size()-utils::commandSize);
         break;
     case utils::backup:
-        onBackupRequest(message.data()+utils::commandSize, message.size()-utils::commandSize);
+        procBackupRequest(message.data()+utils::commandSize, message.size()-utils::commandSize);
         break;
     case utils::clientExit:
-        onclientExit();
+        procClientExit();
         break;
     default:
         std::cerr << "Unsupported command from client." << std::endl;
@@ -57,7 +57,7 @@ void ClientSessionOnServer::onNetworkInput(const QByteArray &message) {
 
 }
 
-void ClientSessionOnServer::onLoginRequest(const char* buffer, std::uint64_t bufferSize) {
+void ClientSessionOnServer::procLoginRequest(const char* buffer, std::uint64_t bufferSize) {
     if (mPerClientState != NOT_AUTORIZATED) {
         std::cerr << "Error with curstate. Unexpected LoginRequest" << std::endl;
         sendServerExit("Oooops. Server exit because of error with curstate. Unexpected LoginRequest.");
@@ -99,7 +99,7 @@ void ClientSessionOnServer::onLoginRequest(const char* buffer, std::uint64_t buf
     sendSerializatedMessage(serializated, utils::ansToClientLogin, serverAnswer.ByteSize());
 }
 
-void ClientSessionOnServer::onLsRequest(const char *buffer, uint64_t bufferSize) {
+void ClientSessionOnServer::procLsRequest(const char *buffer, uint64_t bufferSize) {
     if (mPerClientState != NORMAL) {
         std::cerr << "Error with curstate. Unexpected LSRequest" << std::endl;
         sendServerExit("Oooops. Server exit because of error with curstate. Unexpected LSRequest.");
@@ -173,7 +173,7 @@ void ClientSessionOnServer::sendSerializatedMessage(const std::string& binaryMes
     emit sigSendClientMessage(QByteArray(message.data(), messageSize + utils::commandSize));
 }
 
-void ClientSessionOnServer::onRestoreRequest(const char *bufferbuffer, uint64_t bufferSize) {
+void ClientSessionOnServer::procRestoreRequest(const char *bufferbuffer, uint64_t bufferSize) {
     if (mPerClientState != NORMAL) {
         std::cerr << "Error with curstate. Unexpected RestoreRequest" << std::endl;
         sendServerExit("Oooops. Server exit because of error with curstate. Unexpected RestoreRequest.");
@@ -247,7 +247,7 @@ void ClientSessionOnServer::sendNotFoundBackupIdToClient(std::uint64_t backupId)
     sendSerializatedMessage(serializated, utils::notFoundBackupByIdOnServer, serverError.ByteSize());
 }
 
-void ClientSessionOnServer::onReplyAfterRestore(const char *bufferbuffer, uint64_t bufferSize) {
+void ClientSessionOnServer::procReplyAfterRestore(const char *bufferbuffer, uint64_t bufferSize) {
     if (mPerClientState != WAIT_RESTORE_RESULT) {
         std::cerr << "Error with curstate. Unexpected ReplyAfterRestore" << std::endl;
         sendServerExit("Oooops. Server exit because of error with curstate. Unexpected ReplyAfterRestore.");
@@ -278,7 +278,7 @@ void initServerMetadata(serverUtils::protobufStructs::ServerMetadataForArchive* 
     newServerMetadata->set_failrestorescnt(0);
 }
 
-void ClientSessionOnServer::onBackupRequest(const char *bufferbuffer, uint64_t bufferSize) {
+void ClientSessionOnServer::procBackupRequest(const char *bufferbuffer, uint64_t bufferSize) {
     if (mPerClientState != NORMAL) {
         std::cerr << "Error with curstate. Unexpected BackupRequest" << std::endl;
         sendServerExit("Oooops. Server exit because of error with curstate. Unexpected BackupRequest.");
@@ -327,7 +327,7 @@ void ClientSessionOnServer::onBackupRequest(const char *bufferbuffer, uint64_t b
     mPerClientState = NORMAL;
 }
 
-void ClientSessionOnServer::onclientExit() {
+void ClientSessionOnServer::procClientExit() {
     LOG("onclientExit = %ld\n", mClientNumber);
 }
 
