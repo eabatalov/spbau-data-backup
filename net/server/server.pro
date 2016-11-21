@@ -45,7 +45,8 @@ HEADERS += \
     $$PWD/../protocol/protocol.h \
     $$PWD/../protocol/gen/networkMsgStructs.pb.h \
     $$PWD/gen/serverStructs.pb.h \
-    src/clientsessiononservercreator.h
+    src/clientsessiononservercreator.h \
+    src/authentication.h
     
 DESTDIR = $$PWD/bin
 OBJECTS_DIR = $$PWD/objectfiles

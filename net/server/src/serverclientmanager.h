@@ -6,15 +6,19 @@
 #include <QTcpSocket>
 #include <QDataStream>
 #include <QHostAddress>
+#include <QMutex>
 
+#include <map>
 #include <vector>
-#include "clientsessiononserver.h"
+
+#include "authentication.h"
 
 class ServerClientManager : public QObject {
     Q_OBJECT
 public:
     explicit ServerClientManager(size_t maxClientNumber, QHostAddress adress, quint16 port,QObject *parent = 0);
     ~ServerClientManager();
+    QMutex* tryAuth(AuthStruct authStruct);
 
 public slots:
     void releaseClientPlace(std::uint64_t clientNumber);
@@ -22,8 +26,11 @@ public slots:
 private:
     QTcpServer* mTcpServer;
     size_t mMaxClientNumber;
-    //ClientSessionOnServer** mClients;
+    std::map<std::string, std::uint64_t> sessionNumberPerClient;
+    std::map<std::string, QMutex*> userDataHolder;
     std::vector<bool> used;
+    std::vector<QTcpSocket*> mSockets;
+    std::vector<std::string> loginsBySessionId; //fix it to map?
     bool clientExist(size_t clientNumber);
 
 signals:

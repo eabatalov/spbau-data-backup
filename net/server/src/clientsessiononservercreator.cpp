@@ -1,4 +1,5 @@
 #include "clientsessiononservercreator.h"
+#include "authentication.h"
 
 
 
@@ -18,15 +19,14 @@ void ClientSessionOnServerCreator::init(QTcpSocket * socket, ServerClientManager
 
 ClientSessionOnServerCreator::~ClientSessionOnServerCreator() {
     //delete clientSession;
-    delete mSocket;
+    //delete mSocket;
 }
 
 void ClientSessionOnServerCreator::process() {
-    clientSession = new ClientSessionOnServer(clientId, mSocket, 0);
+    clientSession = new ClientSessionOnServer(serverClientManager, clientId, mSocket, 0);
     qRegisterMetaType<std::uint64_t>("std::uint64_t");
-    connect(clientSession, SIGNAL(releaseClientPlace(std::uint64_t)), serverClientManager, SLOT(releaseClientPlace(std::uint64_t)), Qt::QueuedConnection);
-
-    //TODO: understand why uncommenting this line leads to segfault
-//    connect(clientSession, &ClientSessionOnServer::destroyed, this, &ClientSessionOnServerCreator::deleteLater);
+    qRegisterMetaType<AuthStruct>("AuthStruct");
+    connect(clientSession, &ClientSessionOnServer::releaseClientPlace, serverClientManager, &ServerClientManager::releaseClientPlace);
+    connect(clientSession, &ClientSessionOnServer::destroyed, this, &ClientSessionOnServerCreator::deleteLater);
 }
 

@@ -211,15 +211,6 @@ void ClientSession::sendRestoreResult(bool restoreResult) {
     LOG("Send replyAfterRestore. Size = %d\n", reply.ByteSize());
 }
 
-//// XXX sprintf
-//std::string inttostr(std::uint64_t number) {
-//    const int maxIntSize = 50;
-//    std::vector<char> buf(maxIntSize);
-//    int actualSize = sprintf(buf.data(), "%lud", number);
-//    std::string ans = std::string(buf.data(), actualSize);
-//    return ans;
-//}
-
 void ClientSession::procLoginAns(const char *buffer, uint64_t bufferSize) {
     if (mClientState != WAIT_LOGIN_STATUS) {
         std::cerr << "Unexpected LoginAns" << std::endl;

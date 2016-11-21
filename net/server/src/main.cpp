@@ -5,6 +5,7 @@
 #include <networkMsgStructs.pb.h>
 #include "serverclientmanager.h"
 
+#include <protocol.h>
 #define HOST_ADDRESS "0.0.0.0"
 
 int main(int argc, char *argv[]) {
