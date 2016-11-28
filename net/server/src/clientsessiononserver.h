@@ -10,6 +10,7 @@
 
 #include "authentication.h"
 #include "serverclientmanager.h"
+#include "userdataholder.h"
 
 class ClientSessionOnServer:public QObject {
     Q_OBJECT
@@ -20,14 +21,8 @@ public slots:
 
 private:
     std::uint64_t mSessionNumber;
-    QString mLogin;
     ServerClientManager* serverClientManager;
-    NetworkStream* mNetworkStream;
-    QMutex* mutexOnBackupsFile;
-
-    //TODO: delete it?
-    serverUtils::protobufStructs::VectorOfServerMetadataForArchive mMetadatas;
-    std::uint64_t newBackupId;
+    UserDataHolder* userDataHolder;
 
     std::uint64_t mRestoreBackupId;
     enum PerClientState {
@@ -38,7 +33,7 @@ private:
         ABORTED
     } mPerClientState;
 
-    bool isValidBackupId(std::uint64_t backupId);
+    //bool isValidBackupId(std::uint64_t backupId);
     void procLoginRequest(const char* buffer, std::uint64_t bufferSize);
     void procLsRequest(const char* buffer, std::uint64_t bufferSize);
     void procRestoreRequest(const char* bufferbuffer, std::uint64_t bufferSize);
@@ -46,12 +41,12 @@ private:
     void procBackupRequest(const char* bufferbuffer, std::uint64_t bufferSize);
     void procClientExit();
     void sendSerializatedMessage(const std::string& binaryMessage, utils::commandType cmdType, int messageSize);
-    bool saveStateMetadatas();
+    //bool saveStateMetadatas();
     void sendAnsToClientLogin(bool result);
     void sendNotFoundBackupIdToClient(std::uint64_t backupId);
     void sendServerError(QString message);
     void sendServerExit(QString message);
-    void updateMetadatasFromFile();
+    //void updateMetadatasFromFile();
 
 signals:
     void releaseClientPlace(std::uint64_t clientNumber);

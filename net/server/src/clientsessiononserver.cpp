@@ -24,11 +24,10 @@ ClientSessionOnServer::ClientSessionOnServer(ServerClientManager* serverClientMa
     :QObject(parent)
     ,mSessionNumber(clientNumber)
     ,serverClientManager(serverClientManager)
-    ,newBackupId(0)
     ,mPerClientState(NOT_AUTORIZATED){
-    mNetworkStream = new NetworkStream(clientSocket, this);
-    connect(mNetworkStream, &NetworkStream::newNetMessage, this, &ClientSessionOnServer::onNetworkInput);
-    connect(this, &ClientSessionOnServer::sigSendClientMessage, mNetworkStream, &NetworkStream::sendNetMessage);
+    NetworkStream* networkStream = new NetworkStream(clientSocket, this);
+    connect(networkStream, &NetworkStream::newNetMessage, this, &ClientSessionOnServer::onNetworkInput);
+    connect(this, &ClientSessionOnServer::sigSendClientMessage, networkStream, &NetworkStream::sendNetMessage);
     connect(clientSocket, &QTcpSocket::disconnected, this, &ClientSessionOnServer::disconnectSocket);
 }
 
@@ -75,22 +74,16 @@ void ClientSessionOnServer::procLoginRequest(const char* buffer, std::uint64_t b
     authStruct.login = loginRequest.login();
     authStruct.sessionId = mSessionNumber;
 
-    mutexOnBackupsFile = serverClientManager->tryAuth(authStruct);
-    if (mutexOnBackupsFile == NULL) {
+    userDataHolder = serverClientManager->tryAuth(authStruct);
+    if (userDataHolder == NULL) {
         sendAnsToClientLogin(false);
     } else {
         mPerClientState = NORMAL;
-        this->mutexOnBackupsFile = mutexOnBackupsFile;
-        std::string mLoginStdString = mLogin.toStdString();
+
+        std::string mLoginStdString = userDataHolder->getLogin().toStdString();
         std::cout << "connected user: " << mLoginStdString  << std::endl;
 
-        {
-            QMutexLocker locker(this->mutexOnBackupsFile);
-            updateMetadatasFromFile();
-        }
-
         sendAnsToClientLogin(true);
-        mLogin = QString::fromStdString(loginRequest.login());
     }
 
 }
@@ -119,16 +112,13 @@ void ClientSessionOnServer::procLsRequest(const char *buffer, uint64_t bufferSiz
     networkUtils::protobufStructs::LsClientRequest lsRequest;
     lsRequest.ParseFromArray(buffer, bufferSize);
 
-    QMutexLocker locker(this->mutexOnBackupsFile);
-    updateMetadatasFromFile();
     if (lsRequest.has_backupid()) {
-        if (isValidBackupId(lsRequest.backupid())) {
+        if (userDataHolder->isValidBackupId(lsRequest.backupid())) {
             networkUtils::protobufStructs::LsDetailedServerAnswer lsDetailed;
-            QString path = "backups/" + mLogin + "_" + QString::number((std::uint64_t)(lsRequest.backupid()));
 
             QByteArray metaInQByteArray;
             try {
-                metaInQByteArray = Archiver::getArchiveWithoutContent(path);
+                userDataHolder->setArchiveWithoutContent((std::uint64_t)(lsRequest.backupid()), metaInQByteArray);
             } catch (Archiver::ArchiverException e) {
                 qCritical() << e.whatQMsg() << '\n';
             }
@@ -138,9 +128,9 @@ void ClientSessionOnServer::procLsRequest(const char *buffer, uint64_t bufferSiz
             } else {
                 lsDetailed.set_meta(metaInQByteArray.data(), metaInQByteArray.size());
                 networkUtils::protobufStructs::ShortBackupInfo* backupInfo = new networkUtils::protobufStructs::ShortBackupInfo();
-                backupInfo->set_backupid(mMetadatas.metadatas(lsRequest.backupid()).id());
-                backupInfo->set_path(mMetadatas.metadatas(lsRequest.backupid()).origianlpath());
-                backupInfo->set_time(mMetadatas.metadatas(lsRequest.backupid()).creationtime());
+                backupInfo->set_backupid(lsRequest.backupid());
+                backupInfo->set_path(userDataHolder->getOriginalPath(lsRequest.backupid()));
+                backupInfo->set_time(userDataHolder->getCreationTime(lsRequest.backupid()));
                 lsDetailed.set_allocated_shortbackupinfo(backupInfo);
 
                 std::string serializated;
@@ -158,11 +148,12 @@ void ClientSessionOnServer::procLsRequest(const char *buffer, uint64_t bufferSiz
     } else {
         networkUtils::protobufStructs::LsSummaryServerAnswer lsSummary;
         networkUtils::protobufStructs::ShortBackupInfo* backupInfo = 0;
-        for (int i = 0; i < mMetadatas.metadatas_size(); ++i) {
+        std::uint64_t backupsNumber = userDataHolder->getBackupsNumber();
+        for (uint64_t i = 0; i < backupsNumber; ++i) {
             backupInfo = lsSummary.add_shortbackupinfo();
-            backupInfo->set_backupid(mMetadatas.metadatas(i).id());
-            backupInfo->set_path(mMetadatas.metadatas(i).origianlpath());
-            backupInfo->set_time(mMetadatas.metadatas(i).creationtime());
+            backupInfo->set_backupid(i);
+            backupInfo->set_path(userDataHolder->getOriginalPath(i));
+            backupInfo->set_time(userDataHolder->getCreationTime(i));
         }
 
         std::string serializated;
@@ -191,20 +182,15 @@ void ClientSessionOnServer::procRestoreRequest(const char *bufferbuffer, uint64_
         disconnectSocket();
     }
 
-    QMutexLocker locker(this->mutexOnBackupsFile);
-    updateMetadatasFromFile();
-
     LOG("Receive restore request. Size = %ld\n", bufferSize);
     networkUtils::protobufStructs::RestoreClientRequest restoreRequest;
     restoreRequest.ParseFromArray(bufferbuffer, bufferSize);
 
-    if (isValidBackupId(restoreRequest.backupid())) {
-        QString path = "backups/" + mLogin + "_" + QString::number((std::uint64_t)(restoreRequest.backupid()));
+    if (userDataHolder->isValidBackupId(restoreRequest.backupid())) {
         mRestoreBackupId = restoreRequest.backupid();
 
-        QFile metaFile(path);
-        metaFile.open(QIODevice::ReadOnly);
-        QByteArray archive = metaFile.readAll();
+        QByteArray archive;
+        userDataHolder->setArchive(mRestoreBackupId, archive);
 
         networkUtils::protobufStructs::RestoreServerAnswer restoreAnswer;
         restoreAnswer.set_archive(archive.data(), archive.size());
@@ -261,8 +247,6 @@ void ClientSessionOnServer::sendNotFoundBackupIdToClient(std::uint64_t backupId)
 }
 
 void ClientSessionOnServer::procReplyAfterRestore(const char *bufferbuffer, uint64_t bufferSize) {
-    QMutexLocker locker(this->mutexOnBackupsFile);
-    updateMetadatasFromFile();
     if (mPerClientState != WAIT_RESTORE_RESULT) {
         std::cerr << "Error with curstate. Unexpected ReplyAfterRestore" << std::endl;
         sendServerExit("Oooops. Server exit because of error with curstate. Unexpected ReplyAfterRestore.");
@@ -274,23 +258,11 @@ void ClientSessionOnServer::procReplyAfterRestore(const char *bufferbuffer, uint
     replyAfterRestore.ParseFromArray(bufferbuffer, bufferSize);
 
     if (replyAfterRestore.issuccess()) {
-        mMetadatas.mutable_metadatas(mRestoreBackupId)->set_succrestorescnt(mMetadatas.mutable_metadatas(mRestoreBackupId)->succrestorescnt()+1);
-        LOG("Success restores: %ld\n", mMetadatas.mutable_metadatas(mRestoreBackupId)->succrestorescnt());
+        userDataHolder->incSuccRestoreCount(mRestoreBackupId);
     } else {
-        mMetadatas.mutable_metadatas(mRestoreBackupId)->set_failrestorescnt(mMetadatas.mutable_metadatas(mRestoreBackupId)->failrestorescnt()+1);
-        LOG("Failed restores: %ld\n", mMetadatas.mutable_metadatas(mRestoreBackupId)->failrestorescnt());
+        userDataHolder->incFailRestoreCount(mRestoreBackupId);
     }
-    saveStateMetadatas();
     mPerClientState = NORMAL;
-}
-
-void initServerMetadata(serverUtils::protobufStructs::ServerMetadataForArchive* newServerMetadata,
-                        std::uint64_t backupId, const std::string& originalPath, time_t creationTime) {
-    newServerMetadata->set_id(backupId++);
-    newServerMetadata->set_origianlpath(originalPath);
-    newServerMetadata->set_creationtime(creationTime);
-    newServerMetadata->set_succrestorescnt(0);
-    newServerMetadata->set_failrestorescnt(0);
 }
 
 void ClientSessionOnServer::procBackupRequest(const char *bufferbuffer, uint64_t bufferSize) {
@@ -300,36 +272,16 @@ void ClientSessionOnServer::procBackupRequest(const char *bufferbuffer, uint64_t
         mPerClientState = ABORTED;
         disconnectSocket();
     }
-    QMutexLocker locker(this->mutexOnBackupsFile);
-    updateMetadatasFromFile();
     networkUtils::protobufStructs::ClientBackupRequest backupRequest;
     backupRequest.ParseFromArray(bufferbuffer, bufferSize);
-    serverUtils::protobufStructs::ServerMetadataForArchive* newServerMetadata = mMetadatas.add_metadatas();
-    initServerMetadata(newServerMetadata, newBackupId++, backupRequest.path(), std::time(0));
 
-    bool isSuc = true;
+    bool isSuc;
+    std::uint64_t backupid;
 
-    std::string path = (QString("backups/") + mLogin + "_" + QString::number((std::uint64_t)(newServerMetadata->id()))).toStdString();
-
-    std::fstream archive(path, std::ios::out | std::ios::trunc | std::ios::binary);
-    if (archive.is_open()) {
-        archive.write(backupRequest.archive().c_str(), backupRequest.archive().size());
-    } else {
-        isSuc = false;
-        std::cerr << "Error with creation archive file." << std::endl;
-    }
-
-    if (isSuc) {
-        isSuc = saveStateMetadatas();
-    } else {
-        std::fstream metadatasFile("users/" + mLogin.toStdString() + std::string(".usermetas"), std::ios::in | std::ios::binary);
-        if (!mMetadatas.ParseFromIstream(&metadatasFile)) {
-              std::cerr << "Failed to read metas info." << std::endl;
-        }
-    }
+    userDataHolder->addNewBackup(backupRequest.archive().c_str(), backupRequest.archive().size(), backupRequest.path(), isSuc, backupid);
 
     networkUtils::protobufStructs::ServerBackupResult backupResult;
-    backupResult.set_backupid(newServerMetadata->id());
+    backupResult.set_backupid(backupid);
     backupResult.set_issuccess(isSuc);
 
     std::string serializated;
@@ -351,39 +303,3 @@ void ClientSessionOnServer::disconnectSocket() {
     emit releaseClientPlace(mSessionNumber);
     this->deleteLater();
 }
-
-bool ClientSessionOnServer::isValidBackupId(std::uint64_t backupId) {
-    LOG("Is backupId = %ld < ", backupId);
-    LOG("newBackupId = %ld?\n", newBackupId);
-    if (backupId < newBackupId)
-        return true;
-    else
-        return false;
-}
-
-bool ClientSessionOnServer::saveStateMetadatas() {
-    bool isSuc = true;
-    std::fstream metadatasFile("users/" + mLogin.toStdString() + std::string(".usermetas"), std::ios::out | std::ios::trunc | std::ios::binary);
-    if (!mMetadatas.SerializeToOstream(&metadatasFile)) {
-          std::cerr << "Failed to rewrite metas info file." << std::endl;
-          isSuc = false;
-    }
-    return isSuc;
-}
-
-void ClientSessionOnServer::updateMetadatasFromFile() {
-    std::string mLoginStdString = mLogin.toStdString();
-    std::fstream metadatasFile("users/" + mLoginStdString + ".usermetas", std::ios::in | std::ios::binary);
-    if (metadatasFile.is_open()) {
-        if (!mMetadatas.ParseFromIstream(&metadatasFile)) {
-              std::cerr << "Failed to read metas info." << std::endl;
-        }
-        newBackupId = mMetadatas.metadatas_size();
-    } else {
-        std::fstream newMetadatasFile("users/" + mLoginStdString + std::string(".usermetas"), std::ios::out | std::ios::trunc | std::ios::binary);
-        if (!mMetadatas.SerializeToOstream(&newMetadatasFile)) {
-              std::cerr << "Failed to create metas info file." << std::endl;
-        }
-    }
-}
-

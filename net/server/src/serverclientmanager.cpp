@@ -25,16 +25,16 @@ ServerClientManager::ServerClientManager(size_t maxClientNumber, QHostAddress ad
 ServerClientManager::~ServerClientManager() {
     for (size_t i = 0; i < mMaxClientNumber; ++i) {
         if (mSockets[i]) {
-            mSockets[i]->deleteLater();
+            mSockets[i]->close();
         }
     }
     while (true) {
-        if (userDataHolder.empty())
+        if (users.empty())
             break;
         else
             QThread::sleep(1);
     }
-    mTcpServer->deleteLater();
+    delete mTcpServer;
     google::protobuf::ShutdownProtobufLibrary();
 }
 
@@ -76,30 +76,31 @@ void ServerClientManager::onNewConnection() {
     thread->start();
 }
 
-QMutex *ServerClientManager::tryAuth(AuthStruct authStruct) {
+UserDataHolder *ServerClientManager::tryAuth(const AuthStruct &authStruct) {
+    QMutexLocker locker(&mutexOnAuth);
+
     //TODO: if (...) {..}
 
     //success
-    if (userDataHolder.count(authStruct.login) == 0) {
-        userDataHolder[authStruct.login] = new QMutex();
-    }
-    if (sessionNumberPerClient.count(authStruct.login) == 0) {
-        sessionNumberPerClient[authStruct.login] = 0;
+
+    if (users.count(authStruct.login) == 0) {
+        users.emplace(authStruct.login, QString::fromStdString(authStruct.login));
+        users.at(authStruct.login).dataHolder.initMutex();
+        users.at(authStruct.login).dataHolder.loadMetadatasFromFile();
     }
 
-    ++sessionNumberPerClient[authStruct.login];
+    ++users.at(authStruct.login).sessionNumber;
     loginsBySessionId[authStruct.sessionId] = authStruct.login;
-    return userDataHolder[authStruct.login];
+    return &users.at(authStruct.login).dataHolder;
 }
 
 void ServerClientManager::releaseClientPlace(std::uint64_t clientNumber) {
-    //Is it atomic in QT event loop?
     std::string curLogin = loginsBySessionId[clientNumber];
-    sessionNumberPerClient[curLogin];
     mSockets[clientNumber] = NULL;
-    if (sessionNumberPerClient[curLogin] == 0) {
-        sessionNumberPerClient.erase(curLogin);
-        userDataHolder.erase(curLogin);
+
+    if (users.at(curLogin).sessionNumber == 0) {
+        users.at(curLogin).dataHolder.deleteMutex();
+        users.erase(curLogin);
     }
     used[clientNumber] = false;
 }

@@ -36,7 +36,8 @@ SOURCES += $$PWD/src/main.cpp \
            $$PWD/src/clientsessiononserver.cpp \
            $$PWD/../protocol/gen/networkMsgStructs.pb.cc \
            $$PWD/gen/serverStructs.pb.cc \
-    src/clientsessiononservercreator.cpp
+    src/clientsessiononservercreator.cpp \
+    src/userdataholder.cpp
 
 
 HEADERS += \
@@ -46,7 +47,8 @@ HEADERS += \
     $$PWD/../protocol/gen/networkMsgStructs.pb.h \
     $$PWD/gen/serverStructs.pb.h \
     src/clientsessiononservercreator.h \
-    src/authentication.h
+    src/authentication.h \
+    src/userdataholder.h
     
 DESTDIR = $$PWD/bin
 OBJECTS_DIR = $$PWD/objectfiles
