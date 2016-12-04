@@ -1,14 +1,15 @@
 #include "serverclientmanager.h"
 #include "clientsessiononserver.h"
 #include "clientsessiononservercreator.h"
+#include "threaddeleter.h"
 #include <iostream>
 #include <QThread>
 
 ServerClientManager::ServerClientManager(size_t maxClientNumber, QHostAddress adress, quint16 port, QObject *parent)
     : QObject(parent)
     , mMaxClientNumber(maxClientNumber) {
-    used = std::vector<bool>(mMaxClientNumber, false);
-    loginsBySessionId = std::vector<std::string>(mMaxClientNumber);
+    mUsed = std::vector<bool>(mMaxClientNumber, false);
+    mLoginsBySessionId = std::vector<std::string>(mMaxClientNumber);
     mSockets = std::vector<QTcpSocket*>(mMaxClientNumber);
 
     mTcpServer = new QTcpServer(this);
@@ -29,7 +30,7 @@ ServerClientManager::~ServerClientManager() {
         }
     }
     while (true) {
-        if (users.empty())
+        if (mUsers.empty())
             break;
         else
             QThread::sleep(1);
@@ -39,7 +40,7 @@ ServerClientManager::~ServerClientManager() {
 }
 
 bool ServerClientManager::clientExist(size_t clientNumber) {
-    return (clientNumber < mMaxClientNumber && used[clientNumber]);
+    return (clientNumber < mMaxClientNumber && mUsed[clientNumber]);
 }
 
 void ServerClientManager::onNewConnection() {
@@ -48,7 +49,7 @@ void ServerClientManager::onNewConnection() {
     bool canAdd = false;
     size_t clientNumber = 0;
     for (size_t i = 0; i < mMaxClientNumber && !canAdd; ++i) {
-        if (!used[i]) {
+        if (!mUsed[i]) {
             clientNumber = i;
             canAdd = true;
         }
@@ -59,7 +60,7 @@ void ServerClientManager::onNewConnection() {
         return;
     }
 
-    used[clientNumber] = true;
+    mUsed[clientNumber] = true;
     mSockets[clientNumber] = newClient;
 
     ClientSessionOnServerCreator* clientSessionOnServerCreator = new ClientSessionOnServerCreator();
@@ -70,38 +71,38 @@ void ServerClientManager::onNewConnection() {
     newClient->moveToThread(thread);
 
     connect(thread, &QThread::started, clientSessionOnServerCreator, &ClientSessionOnServerCreator::process);
+    ThreadDeleter* threadDeleter = new ThreadDeleter(thread);
     connect(clientSessionOnServerCreator, &ClientSessionOnServerCreator::destroyed, thread, &QThread::quit);
-    connect(thread, SIGNAL(finished()), thread, SLOT(deleteLater()));
 
     thread->start();
 }
 
 UserDataHolder *ServerClientManager::tryAuth(const AuthStruct &authStruct) {
-    QMutexLocker locker(&mutexOnAuth);
+    QMutexLocker locker(&mMutexOnAuth);
 
     //TODO: if (...) {..}
 
     //success
 
-    if (users.count(authStruct.login) == 0) {
-        users.emplace(authStruct.login, QString::fromStdString(authStruct.login));
-        users.at(authStruct.login).dataHolder.initMutex();
-        users.at(authStruct.login).dataHolder.loadMetadatasFromFile();
+    if (mUsers.count(authStruct.login) == 0) {
+        mUsers.emplace(authStruct.login, QString::fromStdString(authStruct.login));
+        mUsers.at(authStruct.login).dataHolder.initMutex();
+        mUsers.at(authStruct.login).dataHolder.loadMetadatasFromFile();
     }
 
-    ++users.at(authStruct.login).sessionNumber;
-    loginsBySessionId[authStruct.sessionId] = authStruct.login;
-    return &users.at(authStruct.login).dataHolder;
+    ++mUsers.at(authStruct.login).sessionNumber;
+    mLoginsBySessionId[authStruct.sessionId] = authStruct.login;
+    return &mUsers.at(authStruct.login).dataHolder;
 }
 
 void ServerClientManager::releaseClientPlace(std::uint64_t clientNumber) {
-    std::string curLogin = loginsBySessionId[clientNumber];
+    std::string curLogin = mLoginsBySessionId[clientNumber];
     mSockets[clientNumber] = NULL;
 
-    if (users.at(curLogin).sessionNumber == 0) {
-        users.at(curLogin).dataHolder.deleteMutex();
-        users.erase(curLogin);
+    if (mUsers.at(curLogin).sessionNumber == 0) {
+        mUsers.at(curLogin).dataHolder.deleteMutex();
+        mUsers.erase(curLogin);
     }
-    used[clientNumber] = false;
+    mUsed[clientNumber] = false;
 }
 

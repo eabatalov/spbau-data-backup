@@ -23,12 +23,15 @@
 ClientSessionOnServer::ClientSessionOnServer(ServerClientManager* serverClientManager, size_t clientNumber, QTcpSocket* clientSocket, QObject *parent)
     :QObject(parent)
     ,mSessionNumber(clientNumber)
-    ,serverClientManager(serverClientManager)
+    ,mServerClientManager(serverClientManager)
     ,mPerClientState(NOT_AUTORIZATED){
     NetworkStream* networkStream = new NetworkStream(clientSocket, this);
+    connect(this, &ClientSessionOnServer::destroyed, networkStream, &NetworkStream::deleteLater);
     connect(networkStream, &NetworkStream::newNetMessage, this, &ClientSessionOnServer::onNetworkInput);
     connect(this, &ClientSessionOnServer::sigSendClientMessage, networkStream, &NetworkStream::sendNetMessage);
     connect(clientSocket, &QTcpSocket::disconnected, this, &ClientSessionOnServer::disconnectSocket);
+    connect(this, &ClientSessionOnServer::deleteMe, this, &ClientSessionOnServer::deleteLater);
+    connect(this, &ClientSessionOnServer::sigDisconnectSocket, clientSocket, &QTcpSocket::close);
 }
 
 
@@ -64,7 +67,8 @@ void ClientSessionOnServer::procLoginRequest(const char* buffer, std::uint64_t b
         std::cerr << "Error with curstate. Unexpected LoginRequest" << std::endl;
         sendServerExit("Oooops. Server exit because of error with curstate. Unexpected LoginRequest.");
         mPerClientState = ABORTED;
-        disconnectSocket();
+        emit sigDisconnectSocket();
+        return;
     }
 
     networkUtils::protobufStructs::LoginClientRequest loginRequest;
@@ -74,18 +78,18 @@ void ClientSessionOnServer::procLoginRequest(const char* buffer, std::uint64_t b
     authStruct.login = loginRequest.login();
     authStruct.sessionId = mSessionNumber;
 
-    userDataHolder = serverClientManager->tryAuth(authStruct);
-    if (userDataHolder == NULL) {
+    mUserDataHolder = mServerClientManager->tryAuth(authStruct);
+    if (mUserDataHolder == NULL) {
         sendAnsToClientLogin(false);
-    } else {
-        mPerClientState = NORMAL;
-
-        std::string mLoginStdString = userDataHolder->getLogin().toStdString();
-        std::cout << "connected user: " << mLoginStdString  << std::endl;
-
-        sendAnsToClientLogin(true);
+        return;
     }
 
+    mPerClientState = NORMAL;
+
+    std::string mLoginStdString = mUserDataHolder->getLogin().toStdString();
+    std::cout << "connected user: " << mLoginStdString  << std::endl;
+
+    sendAnsToClientLogin(true);
 }
 
 void ClientSessionOnServer::sendAnsToClientLogin(bool result) {
@@ -106,19 +110,20 @@ void ClientSessionOnServer::procLsRequest(const char *buffer, uint64_t bufferSiz
         std::cerr << "Error with curstate. Unexpected LSRequest" << std::endl;
         sendServerExit("Oooops. Server exit because of error with curstate. Unexpected LSRequest.");
         mPerClientState = ABORTED;
-        disconnectSocket();
+        emit sigDisconnectSocket();
+        return;
     }
 
     networkUtils::protobufStructs::LsClientRequest lsRequest;
     lsRequest.ParseFromArray(buffer, bufferSize);
 
     if (lsRequest.has_backupid()) {
-        if (userDataHolder->isValidBackupId(lsRequest.backupid())) {
+        if (mUserDataHolder->isValidBackupId(lsRequest.backupid())) {
             networkUtils::protobufStructs::LsDetailedServerAnswer lsDetailed;
 
             QByteArray metaInQByteArray;
             try {
-                userDataHolder->setArchiveWithoutContent((std::uint64_t)(lsRequest.backupid()), metaInQByteArray);
+                mUserDataHolder->fillArchiveWithoutContent((std::uint64_t)(lsRequest.backupid()), metaInQByteArray);
             } catch (Archiver::ArchiverException e) {
                 qCritical() << e.whatQMsg() << '\n';
             }
@@ -129,8 +134,8 @@ void ClientSessionOnServer::procLsRequest(const char *buffer, uint64_t bufferSiz
                 lsDetailed.set_meta(metaInQByteArray.data(), metaInQByteArray.size());
                 networkUtils::protobufStructs::ShortBackupInfo* backupInfo = new networkUtils::protobufStructs::ShortBackupInfo();
                 backupInfo->set_backupid(lsRequest.backupid());
-                backupInfo->set_path(userDataHolder->getOriginalPath(lsRequest.backupid()));
-                backupInfo->set_time(userDataHolder->getCreationTime(lsRequest.backupid()));
+                backupInfo->set_path(mUserDataHolder->getOriginalPath(lsRequest.backupid()));
+                backupInfo->set_time(mUserDataHolder->getCreationTime(lsRequest.backupid()));
                 lsDetailed.set_allocated_shortbackupinfo(backupInfo);
 
                 std::string serializated;
@@ -148,12 +153,12 @@ void ClientSessionOnServer::procLsRequest(const char *buffer, uint64_t bufferSiz
     } else {
         networkUtils::protobufStructs::LsSummaryServerAnswer lsSummary;
         networkUtils::protobufStructs::ShortBackupInfo* backupInfo = 0;
-        std::uint64_t backupsNumber = userDataHolder->getBackupsNumber();
+        std::uint64_t backupsNumber = mUserDataHolder->getBackupsNumber();
         for (uint64_t i = 0; i < backupsNumber; ++i) {
             backupInfo = lsSummary.add_shortbackupinfo();
             backupInfo->set_backupid(i);
-            backupInfo->set_path(userDataHolder->getOriginalPath(i));
-            backupInfo->set_time(userDataHolder->getCreationTime(i));
+            backupInfo->set_path(mUserDataHolder->getOriginalPath(i));
+            backupInfo->set_time(mUserDataHolder->getCreationTime(i));
         }
 
         std::string serializated;
@@ -179,18 +184,18 @@ void ClientSessionOnServer::procRestoreRequest(const char *bufferbuffer, uint64_
         std::cerr << "Error with curstate. Unexpected RestoreRequest" << std::endl;
         sendServerExit("Oooops. Server exit because of error with curstate. Unexpected RestoreRequest.");
         mPerClientState = ABORTED;
-        disconnectSocket();
+        emit sigDisconnectSocket();
     }
 
     LOG("Receive restore request. Size = %ld\n", bufferSize);
     networkUtils::protobufStructs::RestoreClientRequest restoreRequest;
     restoreRequest.ParseFromArray(bufferbuffer, bufferSize);
 
-    if (userDataHolder->isValidBackupId(restoreRequest.backupid())) {
+    if (mUserDataHolder->isValidBackupId(restoreRequest.backupid())) {
         mRestoreBackupId = restoreRequest.backupid();
 
         QByteArray archive;
-        userDataHolder->setArchive(mRestoreBackupId, archive);
+        mUserDataHolder->fillArchive(mRestoreBackupId, archive);
 
         networkUtils::protobufStructs::RestoreServerAnswer restoreAnswer;
         restoreAnswer.set_archive(archive.data(), archive.size());
@@ -228,7 +233,7 @@ void ClientSessionOnServer::sendServerExit(QString message) {
     std::string serializated;
     if (!serverError.SerializeToString(&serializated)) {
         std::cerr << "Error with serialization serverExit." << std::endl;
-        disconnectSocket();
+        emit sigDisconnectSocket();
         return;
     }
     sendSerializatedMessage(serializated, utils::serverExit, serverError.ByteSize());
@@ -251,16 +256,17 @@ void ClientSessionOnServer::procReplyAfterRestore(const char *bufferbuffer, uint
         std::cerr << "Error with curstate. Unexpected ReplyAfterRestore" << std::endl;
         sendServerExit("Oooops. Server exit because of error with curstate. Unexpected ReplyAfterRestore.");
         mPerClientState = ABORTED;
-        disconnectSocket();
+        emit sigDisconnectSocket();
+        return;
     }
 
     networkUtils::protobufStructs::ClientReplyAfterRestore replyAfterRestore;
     replyAfterRestore.ParseFromArray(bufferbuffer, bufferSize);
 
     if (replyAfterRestore.issuccess()) {
-        userDataHolder->incSuccRestoreCount(mRestoreBackupId);
+        mUserDataHolder->incSuccRestoreCount(mRestoreBackupId);
     } else {
-        userDataHolder->incFailRestoreCount(mRestoreBackupId);
+        mUserDataHolder->incFailRestoreCount(mRestoreBackupId);
     }
     mPerClientState = NORMAL;
 }
@@ -270,7 +276,8 @@ void ClientSessionOnServer::procBackupRequest(const char *bufferbuffer, uint64_t
         std::cerr << "Error with curstate. Unexpected BackupRequest" << std::endl;
         sendServerExit("Oooops. Server exit because of error with curstate. Unexpected BackupRequest.");
         mPerClientState = ABORTED;
-        disconnectSocket();
+        emit sigDisconnectSocket();
+        return;
     }
     networkUtils::protobufStructs::ClientBackupRequest backupRequest;
     backupRequest.ParseFromArray(bufferbuffer, bufferSize);
@@ -278,7 +285,7 @@ void ClientSessionOnServer::procBackupRequest(const char *bufferbuffer, uint64_t
     bool isSuc;
     std::uint64_t backupid;
 
-    userDataHolder->addNewBackup(backupRequest.archive().c_str(), backupRequest.archive().size(), backupRequest.path(), isSuc, backupid);
+    mUserDataHolder->addNewBackup(backupRequest.archive().c_str(), backupRequest.archive().size(), backupRequest.path(), isSuc, backupid);
 
     networkUtils::protobufStructs::ServerBackupResult backupResult;
     backupResult.set_backupid(backupid);
@@ -301,5 +308,5 @@ void ClientSessionOnServer::procClientExit() {
 
 void ClientSessionOnServer::disconnectSocket() {
     emit releaseClientPlace(mSessionNumber);
-    this->deleteLater();
+    emit deleteMe();
 }

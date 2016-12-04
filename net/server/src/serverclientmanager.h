@@ -8,7 +8,7 @@
 #include <QHostAddress>
 #include <QMutex>
 
-#include <map>
+#include <unordered_map>
 #include <vector>
 
 #include "authentication.h"
@@ -35,13 +35,12 @@ public slots:
 
 private:
     QTcpServer* mTcpServer;
-    QMutex mutexOnAuth;
+    QMutex mMutexOnAuth;
     size_t mMaxClientNumber;
-    //std::map<std::string, std::uint64_t> sessionNumberPerClient;
-    std::map<std::string, User> users;
-    std::vector<bool> used;
+    std::unordered_map<std::string, User> mUsers;
+    std::vector<bool> mUsed;
     std::vector<QTcpSocket*> mSockets;
-    std::vector<std::string> loginsBySessionId; //fix it to map?
+    std::vector<std::string> mLoginsBySessionId; //fix it to map?
     bool clientExist(size_t clientNumber);
 
 signals:

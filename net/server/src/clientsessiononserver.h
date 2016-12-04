@@ -15,14 +15,14 @@
 class ClientSessionOnServer:public QObject {
     Q_OBJECT
 public:
-    ClientSessionOnServer(ServerClientManager *serverClientManager, size_t clientNumber, QTcpSocket *clientSocket, QObject* parent = 0);
+    ClientSessionOnServer(ServerClientManager *mServerClientManager, size_t clientNumber, QTcpSocket *clientSocket, QObject* parent = 0);
 
 public slots:
 
 private:
     std::uint64_t mSessionNumber;
-    ServerClientManager* serverClientManager;
-    UserDataHolder* userDataHolder;
+    ServerClientManager* mServerClientManager;
+    UserDataHolder* mUserDataHolder;
 
     std::uint64_t mRestoreBackupId;
     enum PerClientState {
@@ -33,7 +33,6 @@ private:
         ABORTED
     } mPerClientState;
 
-    //bool isValidBackupId(std::uint64_t backupId);
     void procLoginRequest(const char* buffer, std::uint64_t bufferSize);
     void procLsRequest(const char* buffer, std::uint64_t bufferSize);
     void procRestoreRequest(const char* bufferbuffer, std::uint64_t bufferSize);
@@ -41,16 +40,16 @@ private:
     void procBackupRequest(const char* bufferbuffer, std::uint64_t bufferSize);
     void procClientExit();
     void sendSerializatedMessage(const std::string& binaryMessage, utils::commandType cmdType, int messageSize);
-    //bool saveStateMetadatas();
     void sendAnsToClientLogin(bool result);
     void sendNotFoundBackupIdToClient(std::uint64_t backupId);
     void sendServerError(QString message);
     void sendServerExit(QString message);
-    //void updateMetadatasFromFile();
 
 signals:
     void releaseClientPlace(std::uint64_t clientNumber);
     void sigSendClientMessage(const QByteArray & message);
+    void sigDisconnectSocket();
+    void deleteMe();
 
 private slots:
     void onNetworkInput(const QByteArray & message);

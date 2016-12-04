@@ -1,7 +1,7 @@
 #ifndef USERDATAHOLDER_H
 #define USERDATAHOLDER_H
 
-#include <QMutex>
+#include <QReadWriteLock>
 #include <QString>
 
 #include <string>
@@ -11,7 +11,7 @@
 class UserDataHolder
 {
 public:
-    UserDataHolder(QString login);
+    UserDataHolder(QString mLogin);
     QString getLogin();
 
     void loadMetadatasFromFile();
@@ -25,16 +25,16 @@ public:
     std::uint64_t getCreationTime(std::uint64_t backupId);
     std::uint64_t getFailRestoreCount(std::uint64_t backupId);
     std::uint64_t getSuccRestoreCount(std::uint64_t backupId);
-    void setArchiveWithoutContent(std::uint64_t backupId, QByteArray& archiveWithoutContent);
-    void setArchive(std::uint64_t backupId, QByteArray& archive);
+    void fillArchiveWithoutContent(std::uint64_t backupId, QByteArray& archiveWithoutContent);
+    void fillArchive(std::uint64_t backupId, QByteArray& archive);
     void initMutex();
     void deleteMutex();
 
 private:
-    QMutex* mutexOnState;
-    QString login;
+    QReadWriteLock* mReadWriteLock;
+    QString mLogin;
     serverUtils::protobufStructs::VectorOfServerMetadataForArchive mMetadatas;
-    std::uint64_t newBackupId;
+    std::uint64_t mNewBackupId;
 
     std::string getPathToUsermetas();
     QString getPathByBackupId(std::uint64_t backupId);

@@ -13,7 +13,7 @@ class ClientSessionOnServerCreator : public QObject
     Q_OBJECT
 public:
     explicit ClientSessionOnServerCreator(QObject *parent = 0);
-    void init(QTcpSocket * socket, ServerClientManager * serverClientManager, int clientId);
+    void init(QTcpSocket * socket, ServerClientManager * mServerClientManager, int mClientId);
     ~ClientSessionOnServerCreator();
 
 signals:
@@ -23,9 +23,9 @@ public slots:
 
 private:
     QTcpSocket * mSocket;
-    ClientSessionOnServer * clientSession;
-    ServerClientManager * serverClientManager;
-    int clientId;
+    ClientSessionOnServer * mClientSession;
+    ServerClientManager * mServerClientManager;
+    int mClientId;
 };
 
 #endif // CLIENTSESSIONONSERVERCREATOR_H
