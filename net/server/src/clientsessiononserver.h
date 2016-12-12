@@ -15,7 +15,7 @@
 class ClientSessionOnServer:public QObject {
     Q_OBJECT
 public:
-    ClientSessionOnServer(ServerClientManager *mServerClientManager, size_t clientNumber, QTcpSocket *clientSocket, QObject* parent = 0);
+    ClientSessionOnServer(ServerClientManager *serverClientManager, size_t clientNumber, QTcpSocket *clientSocket, QObject* parent = 0);
 
 public slots:
 
@@ -33,6 +33,7 @@ private:
         ABORTED
     } mPerClientState;
 
+    void procRegistarionRequest(const char* buffer, std::uint64_t bufferSize);
     void procLoginRequest(const char* buffer, std::uint64_t bufferSize);
     void procLsRequest(const char* buffer, std::uint64_t bufferSize);
     void procRestoreRequest(const char* bufferbuffer, std::uint64_t bufferSize);
@@ -40,6 +41,7 @@ private:
     void procBackupRequest(const char* bufferbuffer, std::uint64_t bufferSize);
     void procClientExit();
     void sendSerializatedMessage(const std::string& binaryMessage, utils::commandType cmdType, int messageSize);
+    void sendAnsToClietnRegistration(bool result);
     void sendAnsToClientLogin(bool result);
     void sendNotFoundBackupIdToClient(std::uint64_t backupId);
     void sendServerError(QString message);

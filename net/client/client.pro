@@ -14,6 +14,10 @@ CONFIG += c++11
     error( "Couldn't find the networking.pri file!" )
 }
 
+!include( $$PWD/../../lib/consoleRW/consolerw.pri ){
+    error( "Couldn't find the consolerw.pri file!" )
+}
+
 #system($$PWD/../protocol/gen.sh)
 
 TARGET = client
@@ -29,12 +33,10 @@ INCLUDEPATH += \
                $$PWD/../protocol/gen
 
 SOURCES += $$PWD/src/main.cpp \
-           $$PWD/src/consolestream.cpp \
            $$PWD/src/clientsession.cpp \
            $$PWD/../protocol/gen/networkMsgStructs.pb.cc
 
 HEADERS += \
-    $$PWD/src/consolestream.h \
     $$PWD/src/clientsession.h \
     $$PWD/src/client_utils.h \
     $$PWD/../protocol/protocol.h \

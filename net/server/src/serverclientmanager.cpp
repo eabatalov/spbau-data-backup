@@ -2,8 +2,15 @@
 #include "clientsessiononserver.h"
 #include "clientsessiononservercreator.h"
 #include "threaddeleter.h"
+
 #include <iostream>
+#include <fstream>
+#include <sstream>
+#include <string>
+
 #include <QThread>
+#include <QCoreApplication>
+
 
 ServerClientManager::ServerClientManager(size_t maxClientNumber, QHostAddress adress, quint16 port, QObject *parent)
     : QObject(parent)
@@ -21,6 +28,23 @@ ServerClientManager::ServerClientManager(size_t maxClientNumber, QHostAddress ad
         std::cout << "Start listening" << std::endl;
 
     connect(mTcpServer, &QTcpServer::newConnection, this, &ServerClientManager::onNewConnection);
+    ConsoleStream* consoleStream = new ConsoleStream(this);
+    connect(consoleStream, &ConsoleStream::readln, this, &ServerClientManager::onConsoleInput);
+    connect(this, &ServerClientManager::sigWriteToConsole, consoleStream, &ConsoleStream::println);
+
+    std::string pathToUserCredentials("userCredentials.secure");
+    std::fstream usersCredentialsFile(pathToUserCredentials, std::ios::in | std::ios::binary);
+
+    if (usersCredentialsFile.is_open()) {
+        if (!mUsersCredentials.ParseFromIstream(&usersCredentialsFile)) {
+              std::cerr << "Failed to read usersCredentials info." << std::endl;
+        }
+    } else {
+        std::fstream newUsersCredentialsFile(pathToUserCredentials, std::ios::out | std::ios::trunc | std::ios::binary);
+        if (!mUsersCredentials.SerializeToOstream(&newUsersCredentialsFile)) {
+              std::cerr << "Failed to create usersCredentials info file." << std::endl;
+        }
+    }
 }
 
 ServerClientManager::~ServerClientManager() {
@@ -77,12 +101,41 @@ void ServerClientManager::onNewConnection() {
     thread->start();
 }
 
+UserDataHolder *ServerClientManager::tryRegister(const AuthStruct & authStruct) {
+    QMutexLocker locker(&mMutexOnAuth);
+
+    if (isUserRegister(authStruct.login)) {
+        return NULL;
+    }
+
+    serverUtils::protobufStructs::UserCredentials* userCredentials = this->mUsersCredentials.add_usercredentials();
+    userCredentials->set_login(authStruct.login);
+    userCredentials->set_password(authStruct.password);
+
+    std::string pathToUserCredentials("userCredentials.secure");
+    std::fstream usersCredentialsFile(pathToUserCredentials, std::ios::out | std::ios::binary);
+
+    if (usersCredentialsFile.is_open()) {
+        if (!mUsersCredentials.SerializeToOstream(&usersCredentialsFile)) {
+              std::cerr << "Failed to write usersCredentials info." << std::endl;
+        }
+    }
+
+    mUsers.emplace(authStruct.login, QString::fromStdString(authStruct.login));
+    mUsers.at(authStruct.login).dataHolder.initMutex();
+    mUsers.at(authStruct.login).dataHolder.loadMetadatasFromFile();
+
+    ++mUsers.at(authStruct.login).sessionNumber;
+    mLoginsBySessionId[authStruct.sessionId] = authStruct.login;
+    return &mUsers.at(authStruct.login).dataHolder;
+}
+
 UserDataHolder *ServerClientManager::tryAuth(const AuthStruct &authStruct) {
     QMutexLocker locker(&mMutexOnAuth);
 
-    //TODO: if (...) {..}
-
-    //success
+    if (!checkUserCredentials(authStruct.login, authStruct.password)) {
+        return NULL;
+    }
 
     if (mUsers.count(authStruct.login) == 0) {
         mUsers.emplace(authStruct.login, QString::fromStdString(authStruct.login));
@@ -95,14 +148,68 @@ UserDataHolder *ServerClientManager::tryAuth(const AuthStruct &authStruct) {
     return &mUsers.at(authStruct.login).dataHolder;
 }
 
+bool ServerClientManager::isUserRegister(const std::string login) {
+    bool flag = false;
+    for (size_t i = 0; i < mUsersCredentials.usercredentials().size(); ++i) {
+        if (mUsersCredentials.usercredentials(i).login() == login) {
+            flag = true;
+            break;
+        }
+    }
+    return flag;
+}
+
+bool ServerClientManager::checkUserCredentials(const std::string & login, const std::string & password) {
+    bool flag = false;
+    for (size_t i = 0; i < mUsersCredentials.usercredentials().size(); ++i) {
+        if (mUsersCredentials.usercredentials(i).login() == login && mUsersCredentials.usercredentials(i).password() == password) {
+            flag = true;
+            break;
+        }
+    }
+    return flag;
+}
+
 void ServerClientManager::releaseClientPlace(std::uint64_t clientNumber) {
     std::string curLogin = mLoginsBySessionId[clientNumber];
     mSockets[clientNumber] = NULL;
 
-    if (mUsers.at(curLogin).sessionNumber == 0) {
+    if (curLogin != "" && mUsers.at(curLogin).sessionNumber == 0) {
         mUsers.at(curLogin).dataHolder.deleteMutex();
         mUsers.erase(curLogin);
     }
     mUsed[clientNumber] = false;
 }
 
+void ServerClientManager::onConsoleInput(const std::string& message) {
+    if (message == "exit") {
+        //TODO: fix it
+        QCoreApplication* ca;
+        QMetaObject::invokeMethod( ca, "quit");
+        return;
+    }
+
+    if (message == "ls") {
+        std::stringstream ss;
+        ss << "List of session:\n";
+        for (size_t i = 0; i < this->mMaxClientNumber; ++i) {
+            if (mUsed[i]) {
+                ss << "sessionId = " << i << " : " << "Login = " << mLoginsBySessionId[i] << std::endl;
+            }
+        }
+        emit sigWriteToConsole(ss.str()); //tempory object?
+        return;
+    }
+
+    if (message.length() > 6 && message.substr(0, 4) == "kill") {
+        killAllSessionByLogin(message.substr(5));
+    }
+}
+
+void ServerClientManager::killAllSessionByLogin(const std::string& login) {
+    for (size_t i = 0; i < this->mMaxClientNumber; ++i) {
+        if (mUsed[i] && mLoginsBySessionId[i] == login) {
+            mSockets[i]->disconnectFromHost();
+        }
+    }
+}

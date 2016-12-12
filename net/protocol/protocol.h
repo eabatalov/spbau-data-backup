@@ -11,6 +11,7 @@ namespace utils{
     typedef uint8_t commandType;
 
     enum ClientCommandId{
+        clientRegister,
         clientLogin,
         ls,
         restore,
@@ -20,6 +21,7 @@ namespace utils{
     };
 
     enum ServerCommandId{
+        ansToClientRegister,
         ansToClientLogin,
         ansToLsSummary,
         ansToLsDetailed,

@@ -38,6 +38,9 @@ ClientSessionOnServer::ClientSessionOnServer(ServerClientManager* serverClientMa
 void ClientSessionOnServer::onNetworkInput(const QByteArray &message) {
     utils::commandType cmd = *((utils::commandType*)message.data());
     switch (cmd) {
+    case utils::clientRegister:
+        procRegistarionRequest(message.data()+utils::commandSize, message.size()-utils::commandSize);
+        break;
     case utils::clientLogin:
         procLoginRequest(message.data()+utils::commandSize, message.size()-utils::commandSize);
         break;
@@ -62,6 +65,37 @@ void ClientSessionOnServer::onNetworkInput(const QByteArray &message) {
 
 }
 
+void ClientSessionOnServer::procRegistarionRequest(const char* buffer, std::uint64_t bufferSize) {
+    if (mPerClientState != NOT_AUTORIZATED) {
+        std::cerr << "Error with curstate. Unexpected RegistarionRequest" << std::endl;
+        sendServerExit("Oooops. Server exit because of error with curstate. Unexpected RegistarionRequest.");
+        mPerClientState = ABORTED;
+        emit sigDisconnectSocket();
+        return;
+    }
+
+    networkUtils::protobufStructs::LoginClientRequest loginRequest;
+    loginRequest.ParseFromArray(buffer, bufferSize);
+
+    AuthStruct authStruct;
+    authStruct.login = loginRequest.login();
+    authStruct.sessionId = mSessionNumber;
+    authStruct.password = loginRequest.password();
+
+    mUserDataHolder = mServerClientManager->tryRegister(authStruct);
+    if (mUserDataHolder == NULL) {
+        sendAnsToClietnRegistration(false);
+        return;
+    }
+
+    mPerClientState = NORMAL;
+
+    std::string mLoginStdString = mUserDataHolder->getLogin().toStdString();
+    std::cout << "connected user: " << mLoginStdString  << std::endl;
+
+    sendAnsToClietnRegistration(true);
+}
+
 void ClientSessionOnServer::procLoginRequest(const char* buffer, std::uint64_t bufferSize) {
     if (mPerClientState != NOT_AUTORIZATED) {
         std::cerr << "Error with curstate. Unexpected LoginRequest" << std::endl;
@@ -77,6 +111,7 @@ void ClientSessionOnServer::procLoginRequest(const char* buffer, std::uint64_t b
     AuthStruct authStruct;
     authStruct.login = loginRequest.login();
     authStruct.sessionId = mSessionNumber;
+    authStruct.password = loginRequest.password();
 
     mUserDataHolder = mServerClientManager->tryAuth(authStruct);
     if (mUserDataHolder == NULL) {
@@ -103,6 +138,19 @@ void ClientSessionOnServer::sendAnsToClientLogin(bool result) {
         return;
     }
     sendSerializatedMessage(serializated, utils::ansToClientLogin, serverAnswer.ByteSize());
+}
+
+void ClientSessionOnServer::sendAnsToClietnRegistration(bool result) {
+    networkUtils::protobufStructs::LoginServerAnswer serverAnswer;
+    serverAnswer.set_issuccess(result);
+
+    std::string serializated;
+    if (!serverAnswer.SerializeToString(&serializated)) {
+        std::cerr << "Error with serialization LSDetailed." << std::endl;
+        sendServerError("Ooops... Error with serialization LoginServerAnswer.");
+        return;
+    }
+    sendSerializatedMessage(serializated, utils::ansToClientRegister, serverAnswer.ByteSize());
 }
 
 void ClientSessionOnServer::procLsRequest(const char *buffer, uint64_t bufferSize) {

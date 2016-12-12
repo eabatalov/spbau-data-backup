@@ -14,6 +14,10 @@ CONFIG += c++11
     error( "Couldn't find the archiver.pri file!" )
 }
 
+!include( $$PWD/../../lib/consoleRW/consolerw.pri ){
+    error( "Couldn't find the consolerw.pri file!" )
+}
+
 #system($$PWD/../protocol/gen.sh)
 
 TARGET = server

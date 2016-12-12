@@ -37,7 +37,11 @@ void ClientSession::onConsoleInput(const std::string& message) {
     }
 
     if (mClientState == WAIT_LOGIN_INPUT) {
-        sendLoginRequest(message);
+        if (message.size() > 4 && message.substr(0, 4) == "reg ") {
+            sendRegistrationRequest(message.substr(4));
+        } else {
+            sendLoginRequest(message);
+        }
         return;
     }
 
@@ -53,7 +57,7 @@ void ClientSession::onConsoleInput(const std::string& message) {
         emit sigWriteToConsole("Commands:\n"
                                "ls [backupId] -- list all backups shortly or all info about one backup.\n"
                                "restore backupId path -- download backup by backupId and restore it in path.\n"
-                               "backup path -- make backup");
+                               "backup path -- make backup.");
 
     }
 
@@ -74,6 +78,9 @@ void ClientSession::onConsoleInput(const std::string& message) {
 void ClientSession::onNetworkInput(const QByteArray &message) {
     utils::commandType cmd = *((utils::commandType*)message.data());
     switch (cmd) {
+    case utils::ansToClientRegister:
+        procRegistrationAns(message.data()+utils::commandSize, message.size()-utils::commandSize);
+        break;
     case utils::ansToClientLogin:
         procLoginAns(message.data()+utils::commandSize, message.size()-utils::commandSize);
         break;
@@ -107,16 +114,45 @@ void ClientSession::onNetworkInput(const QByteArray &message) {
 void ClientSession::onStart() {
     if (mClientState == NOT_STARTED) {
         mClientState = WAIT_LOGIN_INPUT;
-        emit sigWriteToConsole("Print login:");
+        emit sigWriteToConsole("Print login and password:");
     } else {
         mClientState = ABORTED;
         std::cerr << "Error, connecting after connected..." << std::endl;
     }
 }
 
-void ClientSession::sendLoginRequest(const std::string& login) {
+void ClientSession::sendRegistrationRequest(const std::string & loginAndPassword) {
     networkUtils::protobufStructs::LoginClientRequest loginRequest;
+    size_t spacePosition = loginAndPassword.find(' ');
+    if (spacePosition <= 0 || spacePosition >= loginAndPassword.size()) {
+        emit sigWriteToConsole("Error! Please, print login and password dividing by space:");
+        return;
+    }
+    std::string login = loginAndPassword.substr(0, spacePosition);
+    std::string password = loginAndPassword.substr(spacePosition + 1);
     loginRequest.set_login(login);
+    loginRequest.set_password(password);
+
+    std::string serializatedLoginRequest;
+    if (!loginRequest.SerializeToString(&serializatedLoginRequest)) {
+        std::cerr << "Error with serialization login request cmd." << std::endl;
+        return;
+    }
+    sendSerializatedMessage(serializatedLoginRequest, utils::clientRegister, loginRequest.ByteSize());
+    mClientState = WAIT_LOGIN_STATUS;
+}
+
+void ClientSession::sendLoginRequest(const std::string& loginAndPassword) {
+    networkUtils::protobufStructs::LoginClientRequest loginRequest;
+    size_t spacePosition = loginAndPassword.find(' ');
+    if (spacePosition <= 0 || spacePosition >= loginAndPassword.size()) {
+        emit sigWriteToConsole("Error! Please, print login and password dividing by space:");
+        return;
+    }
+    std::string login = loginAndPassword.substr(0, spacePosition);
+    std::string password = loginAndPassword.substr(spacePosition + 1);
+    loginRequest.set_login(login);
+    loginRequest.set_password(password);
 
     std::string serializatedLoginRequest;
     if (!loginRequest.SerializeToString(&serializatedLoginRequest)) {
@@ -211,6 +247,24 @@ void ClientSession::sendRestoreResult(bool restoreResult) {
     LOG("Send replyAfterRestore. Size = %d\n", reply.ByteSize());
 }
 
+void ClientSession::procRegistrationAns(const char *buffer, uint64_t bufferSize) {
+    if (mClientState != WAIT_LOGIN_STATUS) {
+        std::cerr << "Unexpected RegistrationAns" << std::endl;
+        mClientState = ABORTED;
+        return;
+    }
+
+    networkUtils::protobufStructs::LoginServerAnswer serverAnswer;
+    serverAnswer.ParseFromArray(buffer, bufferSize);
+    if (serverAnswer.issuccess()) {
+        mClientState = WAIT_USER_INPUT;
+        emit sigWriteToConsole("Registration was success. Print command or \"exit\" to close app:");
+    } else {
+        mClientState = WAIT_LOGIN_INPUT;
+        emit sigWriteToConsole("Registration was unsuccess. Print login and password:");
+    }
+}
+
 void ClientSession::procLoginAns(const char *buffer, uint64_t bufferSize) {
     if (mClientState != WAIT_LOGIN_STATUS) {
         std::cerr << "Unexpected LoginAns" << std::endl;
@@ -225,7 +279,7 @@ void ClientSession::procLoginAns(const char *buffer, uint64_t bufferSize) {
         emit sigWriteToConsole("Login was success. Print command or \"exit\" to close app:");
     } else {
         mClientState = WAIT_LOGIN_INPUT;
-        emit sigWriteToConsole("Login was unsuccess. Print login:");
+        emit sigWriteToConsole("Login was unsuccess. Print login and password:");
     }
 }
 

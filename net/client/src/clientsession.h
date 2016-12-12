@@ -4,8 +4,8 @@
 #include <QObject>
 #include "protocol.h"
 #include "networkMsgStructs.pb.h"
-#include "networkstream.h"
-#include "consolestream.h"
+#include <networkstream.h>
+#include <consolestream.h>
 
 class ClientSession : public QObject {
     Q_OBJECT
@@ -34,7 +34,8 @@ private:
     } mClientState;
 
     //SendNetMessage:
-    void sendLoginRequest(const std::string & login);
+    void sendRegistrationRequest(const std::string & loginAndPassword);
+    void sendLoginRequest(const std::string & loginAndPassword);
     void askLs();
     void askLs(const std::string& command);
     void makeRestoreRequest(const std::string& command);
@@ -44,6 +45,7 @@ private:
     void sendSerializatedMessage(const std::string& binaryMessage, utils::commandType cmdType, int messageSize);
 
     //ReceiveNetMessage:
+    void procRegistrationAns(const char *buffer, uint64_t bufferSize);
     void procLoginAns(const char *buffer, uint64_t bufferSize);
     void procDetailedLs(const char *buffer, uint64_t bufferSize);
     void procSummaryLs(const char *buffer, uint64_t bufferSize);

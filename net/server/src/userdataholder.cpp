@@ -41,12 +41,12 @@ void UserDataHolder::loadMetadatasFromFile() {
 }
 
 std::uint64_t UserDataHolder::getBackupsNumber() {
-    QWriteLocker writeLocker(mReadWriteLock);
+    QReadLocker readLocker(mReadWriteLock);
     return mNewBackupId;
 }
 
 bool UserDataHolder::isValidBackupId(std::uint64_t backupId) {
-    QWriteLocker writeLocker(mReadWriteLock);
+    QReadLocker readLocker(mReadWriteLock);
     if (backupId < mNewBackupId)
         return true;
     else

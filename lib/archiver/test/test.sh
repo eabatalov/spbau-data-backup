@@ -22,8 +22,3 @@ cd ./bin
 ./test_archiver -u ../tests/archives/4.pck ../tests/unpacked/
 ./test_archiver -c ../tests/4 ../tests/unpacked/4 
 
-
-./test_archiver -p ../tests/5 ../tests/archives/5.pck
-./test_archiver -u ../tests/archives/5.pck ../tests/unpacked/
-./test_archiver -c ../tests/5 ../tests/unpacked/5
-

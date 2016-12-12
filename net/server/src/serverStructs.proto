@@ -11,3 +11,12 @@ message ServerMetadataForArchive {
 message VectorOfServerMetadataForArchive {
 	repeated ServerMetadataForArchive metadatas = 1;
 }
+
+message UserCredentials {
+	required string login = 1;
+	required string password = 2;
+}
+
+message VectorOfUserCredentials {
+	repeated UserCredentials userCredentials = 1;
+}
