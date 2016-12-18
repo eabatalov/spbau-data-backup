@@ -13,13 +13,17 @@
 #include <QWriteLocker>
 
 UserDataHolder::UserDataHolder(QString login)
-    :mLogin(login)
-    ,mNewBackupId(0) { }
+    :mReadWriteLock(NULL)
+    ,mLogin(login)
+    ,mNewBackupId(0){ }
 
 QString UserDataHolder::getLogin() {
     return mLogin;
 }
 
+UserDataHolder::~UserDataHolder() {
+    delete mReadWriteLock;
+}
 
 //public (Almost all with mutex. Don't call another public methods in it)
 
@@ -142,11 +146,6 @@ void UserDataHolder::addNewBackup(const char* backup, std::uint64_t backupSize, 
 void UserDataHolder::initMutex() {
     mReadWriteLock = new QReadWriteLock();
 }
-
-void UserDataHolder::deleteMutex() {
-    delete mReadWriteLock;
-}
-
 
 
 //private (without mutex)

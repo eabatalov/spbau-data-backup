@@ -11,17 +11,17 @@ ClientSessionOnServerCreator::ClientSessionOnServerCreator(QObject *parent)
 
 }
 
-void ClientSessionOnServerCreator::init(QTcpSocket * socket, ServerClientManager * serverClientManager, int clientId) {
+void ClientSessionOnServerCreator::init(QTcpSocket * socket, ServerClientManager * serverClientManager, uint64_t sessionId) {
     mSocket = socket;
     this->mServerClientManager = serverClientManager;
-    this->mClientId = clientId;
+    this->mSessionId = sessionId;
 }
 
 ClientSessionOnServerCreator::~ClientSessionOnServerCreator() {
 }
 
 void ClientSessionOnServerCreator::process() {
-    mClientSession = new ClientSessionOnServer(mServerClientManager, mClientId, mSocket, 0);
+    mClientSession = new ClientSessionOnServer(mServerClientManager, mSessionId, mSocket, 0);
     qRegisterMetaType<std::uint64_t>("std::uint64_t");
     qRegisterMetaType<AuthStruct>("AuthStruct");
     connect(mClientSession, &ClientSessionOnServer::releaseClientPlace, mServerClientManager, &ServerClientManager::releaseClientPlace);

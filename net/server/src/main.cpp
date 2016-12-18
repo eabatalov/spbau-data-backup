@@ -12,7 +12,7 @@ int main(int argc, char *argv[]) {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
     QCoreApplication app(argc, argv);
 
-    ServerClientManager serverClientManager(4, QHostAddress::Any, PORT_NUMBER, &app);
+    ServerClientManager serverClientManager(&app, QHostAddress::Any, PORT_NUMBER, &app);
 
     return app.exec();
 }

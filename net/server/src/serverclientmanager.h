@@ -1,13 +1,16 @@
 #ifndef SERVERNETWORKSTREAM_H
 #define SERVERNETWORKSTREAM_H
 
-#include <QObject>
-#include <QTcpServer>
-#include <QTcpSocket>
+#include <QCoreApplication>
 #include <QDataStream>
 #include <QHostAddress>
 #include <QMutex>
+#include <QObject>
+#include <QTcpServer>
+#include <QTcpSocket>
 
+#include <queue>
+#include <memory>
 #include <unordered_map>
 #include <vector>
 
@@ -20,7 +23,7 @@
 class ServerClientManager : public QObject {
     Q_OBJECT
 public:
-    explicit ServerClientManager(size_t maxClientNumber, QHostAddress adress, quint16 port,QObject *parent = 0);
+    explicit ServerClientManager(QCoreApplication* app, QHostAddress adress, quint16 port, QObject *parent = 0);
     ~ServerClientManager();
     UserDataHolder* tryAuth(const AuthStruct & authStruct);
     UserDataHolder* tryRegister(const AuthStruct & authStruct);
@@ -34,22 +37,28 @@ public:
             ,sessionNumber(0) { }
     };
 
+    struct Session {
+        QTcpSocket* socket;
+        std::string login;
+        Session(QTcpSocket* socket = NULL)
+            :socket(socket) { }
+    };
+
 public slots:
-    void releaseClientPlace(std::uint64_t clientNumber);
+    void releaseClientPlace(std::uint64_t sessionId);
 
 private:
+    QCoreApplication* mApp;
     QTcpServer* mTcpServer;
     QMutex mMutexOnAuth;
-    size_t mMaxClientNumber;
     std::unordered_map<std::string, User> mUsers;
-    std::vector<bool> mUsed;
-    std::vector<QTcpSocket*> mSockets;
-    std::vector<std::string> mLoginsBySessionId; //fix it to map?
+    std::vector< std::auto_ptr<Session> > mSessions;
+    std::queue<size_t> mFreeSessionIdQueue;
     serverUtils::protobufStructs::VectorOfUserCredentials mUsersCredentials;
 
-    bool clientExist(size_t clientNumber);
+    bool clientExist(size_t sessionId);
     void killAllSessionByLogin(const std::string& login);
-    bool isUserRegister(const std::string login);
+    bool isUserRegister(const std::string & login);
     bool checkUserCredentials(const std::string & login, const std::string & password);
 
 signals:

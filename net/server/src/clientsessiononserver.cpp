@@ -22,7 +22,7 @@
 
 ClientSessionOnServer::ClientSessionOnServer(ServerClientManager* serverClientManager, size_t clientNumber, QTcpSocket* clientSocket, QObject *parent)
     :QObject(parent)
-    ,mSessionNumber(clientNumber)
+    ,mSessionId(clientNumber)
     ,mServerClientManager(serverClientManager)
     ,mPerClientState(NOT_AUTORIZATED){
     NetworkStream* networkStream = new NetworkStream(clientSocket, this);
@@ -79,7 +79,7 @@ void ClientSessionOnServer::procRegistarionRequest(const char* buffer, std::uint
 
     AuthStruct authStruct;
     authStruct.login = loginRequest.login();
-    authStruct.sessionId = mSessionNumber;
+    authStruct.sessionId = mSessionId;
     authStruct.password = loginRequest.password();
 
     mUserDataHolder = mServerClientManager->tryRegister(authStruct);
@@ -91,7 +91,7 @@ void ClientSessionOnServer::procRegistarionRequest(const char* buffer, std::uint
     mPerClientState = NORMAL;
 
     std::string mLoginStdString = mUserDataHolder->getLogin().toStdString();
-    std::cout << "connected user: " << mLoginStdString  << std::endl;
+    std::cout << "connected user: " << mLoginStdString << ", sessionId: " << mSessionId << std::endl;
 
     sendAnsToClietnRegistration(true);
 }
@@ -110,7 +110,7 @@ void ClientSessionOnServer::procLoginRequest(const char* buffer, std::uint64_t b
 
     AuthStruct authStruct;
     authStruct.login = loginRequest.login();
-    authStruct.sessionId = mSessionNumber;
+    authStruct.sessionId = mSessionId;
     authStruct.password = loginRequest.password();
 
     mUserDataHolder = mServerClientManager->tryAuth(authStruct);
@@ -122,7 +122,7 @@ void ClientSessionOnServer::procLoginRequest(const char* buffer, std::uint64_t b
     mPerClientState = NORMAL;
 
     std::string mLoginStdString = mUserDataHolder->getLogin().toStdString();
-    std::cout << "connected user: " << mLoginStdString  << std::endl;
+    std::cout << "connected user: " << mLoginStdString << ", sessionId: " << mSessionId << std::endl;
 
     sendAnsToClientLogin(true);
 }
@@ -351,10 +351,10 @@ void ClientSessionOnServer::procBackupRequest(const char *bufferbuffer, uint64_t
 }
 
 void ClientSessionOnServer::procClientExit() {
-    LOG("onclientExit = %ld\n", mSessionNumber);
+    LOG("onclientExit = %ld\n", mSessionId);
 }
 
 void ClientSessionOnServer::disconnectSocket() {
-    emit releaseClientPlace(mSessionNumber);
+    emit releaseClientPlace(mSessionId);
     emit deleteMe();
 }

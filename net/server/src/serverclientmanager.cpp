@@ -12,13 +12,9 @@
 #include <QCoreApplication>
 
 
-ServerClientManager::ServerClientManager(size_t maxClientNumber, QHostAddress adress, quint16 port, QObject *parent)
+ServerClientManager::ServerClientManager(QCoreApplication *app, QHostAddress adress, quint16 port, QObject *parent)
     : QObject(parent)
-    , mMaxClientNumber(maxClientNumber) {
-    mUsed = std::vector<bool>(mMaxClientNumber, false);
-    mLoginsBySessionId = std::vector<std::string>(mMaxClientNumber);
-    mSockets = std::vector<QTcpSocket*>(mMaxClientNumber);
-
+    , mApp(app){
     mTcpServer = new QTcpServer(this);
     if (!mTcpServer->listen(adress, port)) {
         std::cerr << tr("Unable to start the server: %1.").
@@ -48,51 +44,35 @@ ServerClientManager::ServerClientManager(size_t maxClientNumber, QHostAddress ad
 }
 
 ServerClientManager::~ServerClientManager() {
-    for (size_t i = 0; i < mMaxClientNumber; ++i) {
-        if (mSockets[i]) {
-            mSockets[i]->close();
-        }
-    }
-    while (true) {
-        if (mUsers.empty())
-            break;
-        else
-            QThread::sleep(1);
-    }
     delete mTcpServer;
     google::protobuf::ShutdownProtobufLibrary();
 }
 
-bool ServerClientManager::clientExist(size_t clientNumber) {
-    return (clientNumber < mMaxClientNumber && mUsed[clientNumber]);
+bool ServerClientManager::clientExist(size_t sessionId) {
+    return (mSessions.at(sessionId).get() != NULL);
 }
 
 void ServerClientManager::onNewConnection() {
-    //TODO: fix it
-    QTcpSocket* newClient = mTcpServer->nextPendingConnection();
-    bool canAdd = false;
-    size_t clientNumber = 0;
-    for (size_t i = 0; i < mMaxClientNumber && !canAdd; ++i) {
-        if (!mUsed[i]) {
-            clientNumber = i;
-            canAdd = true;
-        }
-    }
-    if (!canAdd) {
-        std::cerr << "Too much clients..." << std::endl;
-        newClient->deleteLater();
-        return;
-    }
+    QTcpSocket* newSocket = mTcpServer->nextPendingConnection();
 
-    mUsed[clientNumber] = true;
-    mSockets[clientNumber] = newClient;
+    Session* newSession = new Session(newSocket);
+    size_t sessionId = 0;
+
+    if (mFreeSessionIdQueue.empty()) {
+        sessionId = mSessions.size();
+        mSessions.push_back(std::auto_ptr<Session>(newSession));
+    } else {
+        sessionId = mFreeSessionIdQueue.front();
+        mFreeSessionIdQueue.pop();
+        mSessions.at(sessionId).reset(newSession);
+    }
 
     ClientSessionOnServerCreator* clientSessionOnServerCreator = new ClientSessionOnServerCreator();
-    clientSessionOnServerCreator->init(newClient, this, clientNumber);
+    clientSessionOnServerCreator->init(newSocket, this, sessionId);
     QThread* thread = new QThread();
     clientSessionOnServerCreator->moveToThread(thread);
-    newClient->setParent(NULL);
-    newClient->moveToThread(thread);
+    newSocket->setParent(NULL);
+    newSocket->moveToThread(thread);
 
     connect(thread, &QThread::started, clientSessionOnServerCreator, &ClientSessionOnServerCreator::process);
     ThreadDeleter* threadDeleter = new ThreadDeleter(thread);
@@ -126,7 +106,7 @@ UserDataHolder *ServerClientManager::tryRegister(const AuthStruct & authStruct) 
     mUsers.at(authStruct.login).dataHolder.loadMetadatasFromFile();
 
     ++mUsers.at(authStruct.login).sessionNumber;
-    mLoginsBySessionId[authStruct.sessionId] = authStruct.login;
+    mSessions.at(authStruct.sessionId)->login = authStruct.login;
     return &mUsers.at(authStruct.login).dataHolder;
 }
 
@@ -144,11 +124,11 @@ UserDataHolder *ServerClientManager::tryAuth(const AuthStruct &authStruct) {
     }
 
     ++mUsers.at(authStruct.login).sessionNumber;
-    mLoginsBySessionId[authStruct.sessionId] = authStruct.login;
+    mSessions.at(authStruct.sessionId)->login = authStruct.login;
     return &mUsers.at(authStruct.login).dataHolder;
 }
 
-bool ServerClientManager::isUserRegister(const std::string login) {
+bool ServerClientManager::isUserRegister(const std::string & login) {
     bool flag = false;
     for (size_t i = 0; i < mUsersCredentials.usercredentials().size(); ++i) {
         if (mUsersCredentials.usercredentials(i).login() == login) {
@@ -170,31 +150,36 @@ bool ServerClientManager::checkUserCredentials(const std::string & login, const 
     return flag;
 }
 
-void ServerClientManager::releaseClientPlace(std::uint64_t clientNumber) {
-    std::string curLogin = mLoginsBySessionId[clientNumber];
-    mSockets[clientNumber] = NULL;
+void ServerClientManager::releaseClientPlace(std::uint64_t sessionId) {
+    std::string curLogin = mSessions.at(sessionId)->login;
+    mSessions.at(sessionId)->socket = NULL;
 
     if (curLogin != "" && mUsers.at(curLogin).sessionNumber == 0) {
-        mUsers.at(curLogin).dataHolder.deleteMutex();
         mUsers.erase(curLogin);
     }
-    mUsed[clientNumber] = false;
+    mSessions.at(sessionId).reset();
+    mFreeSessionIdQueue.push(sessionId);
 }
 
 void ServerClientManager::onConsoleInput(const std::string& message) {
     if (message == "exit") {
         //TODO: fix it
-        QCoreApplication* ca;
-        QMetaObject::invokeMethod( ca, "quit");
+        for (size_t i = 0; i < mSessions.size(); ++i) {
+            Session* curSession = mSessions.at(i).get();
+            if (curSession != NULL) {
+                curSession->socket->disconnectFromHost();
+            }
+        }
+        QMetaObject::invokeMethod( mApp, "quit");
         return;
     }
 
     if (message == "ls") {
         std::stringstream ss;
         ss << "List of session:\n";
-        for (size_t i = 0; i < this->mMaxClientNumber; ++i) {
-            if (mUsed[i]) {
-                ss << "sessionId = " << i << " : " << "Login = " << mLoginsBySessionId[i] << std::endl;
+        for (size_t i = 0; i < mSessions.size(); ++i) {
+            if (mSessions.at(i).get() != NULL) {
+                ss << "sessionId = " << i << " : " << "Login = " << mSessions.at(i)->login << std::endl;
             }
         }
         emit sigWriteToConsole(ss.str()); //tempory object?
@@ -207,9 +192,10 @@ void ServerClientManager::onConsoleInput(const std::string& message) {
 }
 
 void ServerClientManager::killAllSessionByLogin(const std::string& login) {
-    for (size_t i = 0; i < this->mMaxClientNumber; ++i) {
-        if (mUsed[i] && mLoginsBySessionId[i] == login) {
-            mSockets[i]->disconnectFromHost();
+    for (size_t i = 0; i < mSessions.size(); ++i) {
+        Session* curSession = mSessions.at(i).get();
+        if (curSession != NULL && curSession->login == login) {
+            curSession->socket->disconnectFromHost();
         }
     }
 }

@@ -28,7 +28,7 @@ public:
     void fillArchiveWithoutContent(std::uint64_t backupId, QByteArray& archiveWithoutContent);
     void fillArchive(std::uint64_t backupId, QByteArray& archive);
     void initMutex();
-    void deleteMutex();
+    ~UserDataHolder();
 
 private:
     QReadWriteLock* mReadWriteLock;

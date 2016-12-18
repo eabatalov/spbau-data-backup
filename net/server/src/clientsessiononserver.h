@@ -20,7 +20,7 @@ public:
 public slots:
 
 private:
-    std::uint64_t mSessionNumber;
+    std::uint64_t mSessionId;
     ServerClientManager* mServerClientManager;
     UserDataHolder* mUserDataHolder;
 
